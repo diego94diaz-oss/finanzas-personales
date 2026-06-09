@@ -299,7 +299,7 @@ function tarjetas(){ return data.accounts.filter(a=>a.card); }
 function cardDebt(){ return tarjetas().reduce((s,a)=>s+(a.utilizado||0),0); }
 
 function debtPaid(d){ return (d.payments||[]).reduce((s,p)=>s+p.amount,0); }
-function debtSaldo(d){ return Math.max(0,(d.original||0)-debtPaid(d)); }
+function debtSaldo(d){ if(d.tipo==="credito") return Math.max(0,d.saldo||0); return Math.max(0,(d.original||0)-debtPaid(d)); }
 function totalDebt(){ return data.debts.reduce((s,d)=>s+debtSaldo(d),0) + cardDebt(); }
 function nextBilling(day){
   const t=new Date(); let y=t.getFullYear(), m=t.getMonth();
@@ -463,6 +463,7 @@ function renderTransactions(){
 function renderDebts(){
   if(!data.debts.length){ document.getElementById("debts-list").innerHTML=`<div class="panel"><div class="empty">No tienes deudas registradas. 🎉</div></div>`; return; }
   document.getElementById("debts-list").innerHTML=data.debts.map(d=>{
+    if(d.tipo==="credito") return renderCredito(d);
     const saldo=debtSaldo(d), paid=debtPaid(d), pct=d.original?Math.min(100,paid/d.original*100):0;
     const pays=[...(d.payments||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
     let running=d.original;
@@ -494,6 +495,39 @@ function renderDebts(){
         :`<div class="empty">Aún sin pagos registrados.</div>`}
     </div>`;
   }).join("");
+}
+
+function renderCredito(d){
+  const pag=d.cuotasPagadas||0, tot=d.cuotasTotal||0, rest=Math.max(0,tot-pag);
+  const pct=tot?Math.round(pag/tot*100):0;
+  const enCuotas=rest*(d.cuota||0);                 // efectivo que falta por pagar
+  const interesMes=Math.round((d.saldo||0)*(d.rate||0)/100);
+  const pays=[...(d.payments||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
+  return `<div class="panel">
+    <div class="flex"><h2 style="margin:0">${d.name}</h2>
+      <span class="pill">${d.creditor||"—"}</span>
+      <span class="pill">${d.rate||0}% mensual</span>
+      <span class="pill">paga el ${d.payDay} · próx. ${nextBilling(d.payDay)}</span>
+      <div class="spacer"></div>
+      <button class="icon-del" onclick="delDebt('${d.id}')">✕ eliminar</button></div>
+    <div class="grid cards" style="margin-top:12px">
+      <div class="card"><h3>Saldo adeudado</h3><div class="big neg">${clp(d.saldo)}</div></div>
+      <div class="card"><h3>Cuota mensual</h3><div class="big">${clp(d.cuota)}</div></div>
+      <div class="card"><h3>Cuotas</h3><div class="big">${pag}<span class="muted" style="font-size:16px">/${tot}</span></div></div>
+      <div class="card"><h3>Falta por pagar</h3><div class="big">${clp(enCuotas)}</div><div class="small muted">${rest} cuotas</div></div>
+    </div>
+    <div class="progress"><div style="width:${pct}%"></div></div>
+    <div class="small muted" style="margin-top:4px">${pct}% pagado · solicitado ${clp(d.montoSolicitado)} · de tu próxima cuota, ~${clp(interesMes)} es interés</div>
+    <hr>
+    <div class="row">
+      <div><label>Fecha del pago</label><input type="date" id="pay-date-${d.id}" value="${todayStr()}"></div>
+      <div><button class="btn" onclick="registrarCuota('${d.id}')">Registrar pago de cuota (${clp(d.cuota)})</button></div>
+    </div>
+    ${pays.length?`<table style="margin-top:12px"><thead><tr><th>Fecha</th><th style="text-align:right">Cuota</th><th style="text-align:right">Interés</th><th style="text-align:right">Capital</th><th style="text-align:right">Saldo después</th><th></th></tr></thead>
+      <tbody>${pays.map(p=>`<tr><td>${p.date}</td><td style="text-align:right">${clp(p.amount)}</td><td class="neg" style="text-align:right">${clp(p.interes||0)}</td><td class="pos" style="text-align:right">${clp(p.capital||0)}</td><td style="text-align:right">${clp(p.saldoDespues||0)}</td>
+      <td style="text-align:right"><button class="icon-del" onclick="delCuota('${d.id}','${p.id}')">✕</button></td></tr>`).join("")}</tbody></table>`
+      :`<div class="empty">Registra aquí cada cuota que pagues para ir bajando el saldo.</div>`}
+  </div>`;
 }
 
 function renderAnalisis(){
@@ -660,6 +694,29 @@ function addPayment(debtId){
   save(); renderAll();
 }
 function delPayment(debtId,payId){ const d=data.debts.find(x=>x.id===debtId); if(!d) return; d.payments=d.payments.filter(p=>p.id!==payId); save(); renderAll(); }
+
+// Crédito amortizado: registrar una cuota descuenta interés del saldo y baja el capital
+function registrarCuota(id){
+  const d=data.debts.find(x=>x.id===id); if(!d) return;
+  if((d.cuotasPagadas||0)>=(d.cuotasTotal||0)){ alert("Este crédito ya está pagado. 🎉"); return; }
+  const date=document.getElementById("pay-date-"+id).value||todayStr();
+  const interes=Math.round((d.saldo||0)*(d.rate||0)/100);
+  const capital=Math.max(0,(d.cuota||0)-interes);
+  d.saldo=Math.max(0,(d.saldo||0)-capital);
+  d.cuotasPagadas=(d.cuotasPagadas||0)+1;
+  d.payments=d.payments||[];
+  d.payments.push({id:uid(),date,amount:d.cuota,interes,capital,saldoDespues:d.saldo});
+  save(); renderAll();
+}
+function delCuota(id,payId){
+  const d=data.debts.find(x=>x.id===id); if(!d) return;
+  const p=(d.payments||[]).find(x=>x.id===payId); if(!p) return;
+  if(!confirm("¿Eliminar esta cuota? Se devolverá el capital al saldo.")) return;
+  d.saldo=(d.saldo||0)+(p.capital||0);
+  d.cuotasPagadas=Math.max(0,(d.cuotasPagadas||0)-1);
+  d.payments=d.payments.filter(x=>x.id!==payId);
+  save(); renderAll();
+}
 
 /* ============ Respaldo ============ */
 function exportData(){
