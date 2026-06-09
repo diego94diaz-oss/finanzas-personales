@@ -300,7 +300,8 @@ function cardDebt(){ return tarjetas().reduce((s,a)=>s+(a.utilizado||0),0); }
 
 function debtPaid(d){ return (d.payments||[]).reduce((s,p)=>s+p.amount,0); }
 function debtSaldo(d){ if(d.tipo==="credito") return Math.max(0,d.saldo||0); return Math.max(0,(d.original||0)-debtPaid(d)); }
-function totalDebt(){ return data.debts.reduce((s,d)=>s+debtSaldo(d),0) + cardDebt(); }
+// excluye deudas que ya están dentro del cupo usado de una tarjeta (no contar doble)
+function totalDebt(){ return data.debts.filter(d=>!d.incluidoEn).reduce((s,d)=>s+debtSaldo(d),0) + cardDebt(); }
 function nextBilling(day){
   const t=new Date(); let y=t.getFullYear(), m=t.getMonth();
   if(t.getDate()>day){ m++; if(m>11){m=0;y++;} }
@@ -502,14 +503,16 @@ function renderCredito(d){
   const pct=tot?Math.round(pag/tot*100):0;
   const enCuotas=rest*(d.cuota||0);                 // efectivo que falta por pagar
   const interesMes=Math.round((d.saldo||0)*(d.rate||0)/100);
+  const sinInteres=!d.rate;
   const pays=[...(d.payments||[])].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
   return `<div class="panel">
     <div class="flex"><h2 style="margin:0">${d.name}</h2>
       <span class="pill">${d.creditor||"—"}</span>
-      <span class="pill">${d.rate||0}% mensual</span>
+      <span class="pill">${sinInteres?"0% · sin interés":(d.rate+"% mensual")}</span>
       <span class="pill">paga el ${d.payDay} · próx. ${nextBilling(d.payDay)}</span>
       <div class="spacer"></div>
       <button class="icon-del" onclick="delDebt('${d.id}')">✕ eliminar</button></div>
+      ${d.incluidoEn?`<div class="tip">ℹ️ Esta deuda en cuotas ya está incluida en el cupo usado de tu <b>${d.incluidoEn}</b>, por eso no se suma aparte a la deuda total.</div>`:""}
     <div class="grid cards" style="margin-top:12px">
       <div class="card"><h3>Saldo adeudado</h3><div class="big neg">${clp(d.saldo)}</div></div>
       <div class="card"><h3>Cuota mensual</h3><div class="big">${clp(d.cuota)}</div></div>
@@ -517,7 +520,7 @@ function renderCredito(d){
       <div class="card"><h3>Falta por pagar</h3><div class="big">${clp(enCuotas)}</div><div class="small muted">${rest} cuotas</div></div>
     </div>
     <div class="progress"><div style="width:${pct}%"></div></div>
-    <div class="small muted" style="margin-top:4px">${pct}% pagado · solicitado ${clp(d.montoSolicitado)} · de tu próxima cuota, ~${clp(interesMes)} es interés</div>
+    <div class="small muted" style="margin-top:4px">${pct}% pagado · solicitado ${clp(d.montoSolicitado)}${sinInteres?" · sin interés":` · de tu próxima cuota, ~${clp(interesMes)} es interés`}</div>
     <hr>
     <div class="row">
       <div><label>Fecha del pago</label><input type="date" id="pay-date-${d.id}" value="${todayStr()}"></div>
