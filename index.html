@@ -116,6 +116,10 @@
   <!-- DASHBOARD -->
   <section id="dashboard" class="section active">
     <div class="grid cards" id="dash-cards"></div>
+    <div class="panel" id="dash-credito-panel">
+      <h2>💳 Tarjetas de crédito</h2>
+      <div class="grid cards" id="dash-credito"></div>
+    </div>
     <div class="panel">
       <h2>Gastos por categoría — <span id="dash-month"></span></h2>
       <div id="dash-cats"></div>
@@ -287,11 +291,22 @@ function accountBalance(accId){
   }
   return bal;
 }
-function totalBalance(){ return data.accounts.reduce((s,a)=>s+accountBalance(a.id),0); }
+// Saldo total = solo dinero líquido (excluye tarjetas de crédito y la cuenta puente)
+function totalBalance(){
+  return data.accounts.filter(a=>!a.card && a.name!=="Movimientos internos")
+                      .reduce((s,a)=>s+accountBalance(a.id),0); }
+function tarjetas(){ return data.accounts.filter(a=>a.card); }
+function cardDebt(){ return tarjetas().reduce((s,a)=>s+(a.utilizado||0),0); }
 
 function debtPaid(d){ return (d.payments||[]).reduce((s,p)=>s+p.amount,0); }
 function debtSaldo(d){ return Math.max(0,(d.original||0)-debtPaid(d)); }
-function totalDebt(){ return data.debts.reduce((s,d)=>s+debtSaldo(d),0); }
+function totalDebt(){ return data.debts.reduce((s,d)=>s+debtSaldo(d),0) + cardDebt(); }
+function nextBilling(day){
+  const t=new Date(); let y=t.getFullYear(), m=t.getMonth();
+  if(t.getDate()>day){ m++; if(m>11){m=0;y++;} }
+  const dd=String(day).padStart(2,"0"), mm=String(m+1).padStart(2,"0");
+  return dd+"/"+mm;
+}
 
 function monthsSpan(){
   const keys=new Set(data.transactions.map(t=>monthKey(t.date)).filter(Boolean));
@@ -321,7 +336,7 @@ function renderDashboard(){
   const ingMes=sumByType("ingreso",mk), gasMes=sumByType("gasto",mk);
   const ahorro=ingMes-gasMes;
   const cards=[
-    {h:"Saldo total",v:clp(totalBalance()),c:""},
+    {h:"Saldo total (líquido)",v:clp(totalBalance()),c:""},
     {h:"Ingresos del mes",v:clp(ingMes),c:"pos"},
     {h:"Gastos del mes",v:clp(gasMes),c:"neg"},
     {h:"Balance del mes",v:clp(ahorro),c:ahorro>=0?"pos":"neg"},
@@ -330,6 +345,7 @@ function renderDashboard(){
   document.getElementById("dash-cards").innerHTML=cards.map(c=>
     `<div class="card"><h3>${c.h}</h3><div class="big ${c.c}">${c.v}</div></div>`).join("");
 
+  renderCreditCards();
   document.getElementById("dash-month").textContent=monthLabel(mk);
   document.getElementById("dash-cats").innerHTML=catBars(mk);
 
@@ -345,6 +361,28 @@ function renderDashboard(){
       </div>
       <div class="bar-val"><span class="pos">${clp(ing)}</span><br><span class="neg">${clp(gas)}</span></div></div>`;
   }).join("") : `<div class="empty">Aún no hay movimientos.</div>`;
+}
+
+function renderCreditCards(){
+  const cards=tarjetas();
+  const panel=document.getElementById("dash-credito-panel");
+  if(!cards.length){ if(panel) panel.style.display="none"; return; }
+  if(panel) panel.style.display="";
+  document.getElementById("dash-credito").innerHTML=cards.map(c=>{
+    const cupo=c.cupo||0, util=c.utilizado||0, disp=cupo-util, pct=cupo?Math.min(100,util/cupo*100):0;
+    const alto=pct>=80;
+    return `<div class="card">
+      <div class="flex" style="justify-content:space-between"><b>💳 ${c.name}</b>
+        <span class="pill">factura el ${c.billingDay} · próx. ${nextBilling(c.billingDay)}</span></div>
+      <div style="margin:10px 0 4px"><span class="muted small">Utilizado</span>
+        <div class="big neg" style="font-size:20px">${clp(util)}</div></div>
+      <div class="progress" style="height:12px"><div style="width:${pct}%;background:${alto?'linear-gradient(90deg,#fbbf24,#f87171)':'linear-gradient(90deg,#b388ff,#f87171)'}"></div></div>
+      <div class="flex small" style="justify-content:space-between;margin-top:6px">
+        <span class="muted">Cupo: ${clp(cupo)}</span>
+        <span>Disponible: <b class="pos">${clp(disp)}</b></span>
+        <span class="${alto?'neg':'muted'}">${Math.round(pct)}% usado</span></div>
+    </div>`;
+  }).join("");
 }
 
 function catBars(mk){
