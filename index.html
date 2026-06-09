@@ -108,6 +108,7 @@
   <button data-tab="cuentas">Cuentas</button>
   <button data-tab="movimientos">Movimientos</button>
   <button data-tab="deudas">Deudas</button>
+  <button data-tab="plan">Plan de pago</button>
   <button data-tab="analisis">Análisis</button>
   <button data-tab="respaldo">Respaldo</button>
 </nav>
@@ -205,6 +206,11 @@
       </div>
     </div>
     <div id="debts-list"></div>
+  </section>
+
+  <!-- PLAN DE PAGO -->
+  <section id="plan" class="section">
+    <div id="plan-content"></div>
   </section>
 
   <!-- ANALISIS -->
@@ -329,7 +335,7 @@ document.getElementById("nav").addEventListener("click",e=>{
 
 /* ============ Render ============ */
 function renderAll(){
-  renderDashboard(); renderAccounts(); renderTransactions(); renderDebts(); renderAnalisis(); renderStorageInfo();
+  renderDashboard(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderAnalisis(); renderStorageInfo();
 }
 
 function renderDashboard(){
@@ -531,6 +537,60 @@ function renderCredito(d){
       <td style="text-align:right"><button class="icon-del" onclick="delCuota('${d.id}','${p.id}')">✕</button></td></tr>`).join("")}</tbody></table>`
       :`<div class="empty">Registra aquí cada cuota que pagues para ir bajando el saldo.</div>`}
   </div>`;
+}
+
+function mesNombre(offset){
+  const t=new Date(); t.setMonth(t.getMonth()+offset);
+  const m=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return m[t.getMonth()]+" "+t.getFullYear();
+}
+function simulaCredito(saldo,rateMensual,cuota,extra){
+  let S=saldo,m=0,interes=0;
+  while(S>0.5 && m<600){ const i=S*rateMensual/100; const pago=Math.min(cuota+extra,S+i); S=S+i-pago; interes+=i; m++; }
+  return {meses:m,interes:Math.round(interes)};
+}
+function renderPlan(){
+  const conInteres=data.debts.filter(d=>d.tipo==="credito" && (d.rate||0)>0 && debtSaldo(d)>0);
+  const cero=data.debts.filter(d=>d.tipo==="credito" && !(d.rate>0) && debtSaldo(d)>0);
+  let html="";
+
+  html+=`<div class="panel"><h2>🎯 Estrategia recomendada</h2>
+    <div class="tip"><b>1.</b> Las deudas a <b>0% interés</b> (compras en cuotas): paga solo el mínimo, <b>nunca las adelantes</b> — esa plata no te cuesta interés.</div>
+    <div class="tip"><b>2.</b> Todo excedente va a tu <b>única deuda con interés</b>: el crédito de consumo. Cada abono extra ahí te ahorra intereses reales.</div>
+    <div class="tip"><b>3.</b> Antes de adelantar fuerte, ten un <b>colchón de emergencia</b> (≈1 mes de gastos). Tu saldo líquido hoy es ${clp(totalBalance())}; no te quedes sin liquidez por ahorrar poco interés.</div>
+  </div>`;
+
+  if(conInteres.length){
+    conInteres.forEach(d=>{
+      const saldo=debtSaldo(d), base=simulaCredito(saldo,d.rate,d.cuota,0);
+      const escen=[0,200000,500000,1000000].map(ex=>({ex,...simulaCredito(saldo,d.rate,d.cuota,ex)}));
+      html+=`<div class="panel"><h2>📉 ${d.name} — proyección</h2>
+        <div class="small muted" style="margin-bottom:10px">Saldo ${clp(saldo)} · cuota ${clp(d.cuota)} · tasa ${d.rate}% mensual</div>
+        <table><thead><tr><th>Abono extra/mes</th><th style="text-align:right">Cuota total</th><th>Quedas libre</th><th style="text-align:right">Interés total</th><th style="text-align:right">Ahorro</th></tr></thead><tbody>
+        ${escen.map(e=>`<tr>
+          <td>${e.ex?'+'+clp(e.ex):'<span class="muted">$0 (actual)</span>'}</td>
+          <td style="text-align:right">${clp(d.cuota+e.ex)}</td>
+          <td><b>${e.meses} meses</b> <span class="muted small">(~${mesNombre(e.meses)})</span></td>
+          <td style="text-align:right">${clp(e.interes)}</td>
+          <td style="text-align:right" class="pos">${e.ex?clp(base.interes-e.interes):'—'}</td>
+        </tr>`).join("")}
+        </tbody></table></div>`;
+    });
+  }
+
+  if(cero.length){
+    html+=`<div class="panel"><h2>🟢 Cuotas sin interés (pagar al mínimo)</h2>
+      <table><thead><tr><th>Deuda</th><th style="text-align:right">Saldo</th><th>Cuotas restantes</th><th>Se libera en</th></tr></thead><tbody>
+      ${cero.map(d=>{const rest=(d.cuotasTotal||0)-(d.cuotasPagadas||0);return `<tr>
+        <td>${d.name}</td><td style="text-align:right">${clp(debtSaldo(d))}</td>
+        <td>${rest} de ${clp(d.cuota)}</td><td class="muted">~${mesNombre(rest)}</td></tr>`;}).join("")}
+      </tbody></table>
+      <div class="tip" style="margin-top:10px">💡 A medida que termines estas cuotas se te liberan <b>${clp(cero.reduce((s,d)=>s+(d.cuota||0),0))}/mes</b> que puedes redirigir al crédito con interés.</div>
+      </div>`;
+  }
+
+  if(!conInteres.length && !cero.length) html+=`<div class="panel"><div class="empty">No hay créditos en cuotas registrados.</div></div>`;
+  document.getElementById("plan-content").innerHTML=html;
 }
 
 function renderAnalisis(){
