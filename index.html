@@ -7,99 +7,91 @@
 <script src="datos_cifrados.js"></script>
 <style>
   :root{
-    --bg:#050506; --panel:#0d0d0f; --panel2:#161619; --text:#e8e8ea; --muted:#7d7d85;
-    --lime:#b6f009; --violet:#b388ff; --green:#a6e635; --red:#ef6a6a; --border:#27272b;
-    --grid:rgba(255,255,255,.035);
+    --bg:#f5f6f8; --panel:#ffffff; --panel2:#f3f4f7; --text:#101729; --muted:#697586;
+    --accent:#2f56f0; --accent-soft:#eaeefe; --green:#15a24a; --red:#e02424; --amber:#d97706;
+    --violet:#6366f1; --border:#e7e9ee;
+    --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 20px rgba(16,24,40,.06);
   }
   *{box-sizing:border-box}
   body{
-    margin:0;font-family:"Segoe UI",system-ui,Arial,sans-serif;color:var(--text);font-size:15px;
-    background-color:var(--bg);
-    background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-    background-size:54px 54px;
+    margin:0;font-family:"Inter","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+    color:var(--text);font-size:15px;background:var(--bg);-webkit-font-smoothing:antialiased;
   }
   header{
-    display:flex;align-items:center;gap:18px;padding:20px 24px;
+    display:flex;align-items:center;gap:14px;padding:18px 24px;background:var(--panel);
     border-bottom:1px solid var(--border);
-    background:linear-gradient(180deg,rgba(179,136,255,.06),transparent);
   }
-  header h1{margin:0;font-size:21px;letter-spacing:.3px}
-  header p{margin:4px 0 0;color:var(--muted);font-size:13px}
-  /* Robot mascota IA */
-  .bot{width:68px;height:68px;flex-shrink:0;border-radius:20px;background:#101013;border:1px solid var(--border);
-    position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px}
-  .bot .ant{position:absolute;top:-14px;width:2px;height:14px;background:#3a3a40}
-  .bot .ant.l{left:19px;transform:rotate(-16deg)} .bot .ant.r{right:19px;transform:rotate(16deg)}
-  .bot .ant::after{content:"";position:absolute;top:-7px;left:-3.5px;width:9px;height:9px;border-radius:50%;background:var(--violet);box-shadow:0 0 10px var(--violet)}
-  .bot .ia{font-weight:800;font-size:15px;letter-spacing:1px;color:#d9d9dd}
-  .bot .mouth{display:flex;gap:4px;align-items:center}
-  .bot .mouth i{width:7px;height:7px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet)}
-  .bot .mouth span{width:8px;height:2px;background:var(--violet);border-radius:2px}
-  nav{display:flex;gap:4px;flex-wrap:wrap;background:rgba(10,10,12,.92);backdrop-filter:blur(6px);padding:8px 14px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
-  nav button{background:transparent;border:1px solid transparent;color:var(--muted);padding:8px 15px;border-radius:10px;cursor:pointer;font-size:14px}
+  .logo{width:44px;height:44px;flex-shrink:0;border-radius:13px;
+    background:linear-gradient(135deg,#2f56f0,#6366f1);display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:800;font-size:22px;
+    box-shadow:0 6px 16px rgba(47,86,240,.35)}
+  header h1{margin:0;font-size:20px;letter-spacing:-.2px;font-weight:700}
+  header p{margin:3px 0 0;color:var(--muted);font-size:13px}
+  nav{display:flex;gap:4px;flex-wrap:wrap;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+    padding:10px 16px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
+  nav button{background:transparent;border:none;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:500}
   nav button:hover{background:var(--panel2);color:var(--text)}
-  nav button.active{background:var(--lime);color:#0a0a00;font-weight:700}
-  main{padding:20px;max-width:1100px;margin:0 auto}
+  nav button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
+  main{padding:22px;max-width:1120px;margin:0 auto}
   .section{display:none}
   .section.active{display:block}
   .grid{display:grid;gap:14px}
   .cards{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px}
-  .card h3{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.6px}
-  .card .big{font-size:24px;font-weight:700}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:16px}
-  .panel h2{margin:0 0 14px;font-size:17px}
-  label{display:block;font-size:13px;color:var(--muted);margin:0 0 4px}
-  input,select,textarea{width:100%;padding:9px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .card h3{margin:0 0 8px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .card .big{font-size:25px;font-weight:700;letter-spacing:-.5px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 14px;font-size:17px;font-weight:700;letter-spacing:-.2px}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 5px;font-weight:500}
+  input,select,textarea{width:100%;padding:10px 12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit}
   textarea{resize:vertical;line-height:1.4}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--lime);box-shadow:0 0 0 2px rgba(182,240,9,.15)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,86,240,.13)}
   .row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end}
-  button.btn{background:var(--lime);color:#0a0a00;border:none;padding:10px 16px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px}
-  button.btn:hover{filter:brightness(1.08)}
-  button.btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border);font-weight:600}
-  button.btn.danger{background:transparent;color:var(--red);border:1px solid var(--red);font-weight:600}
+  button.btn{background:var(--accent);color:#fff;border:none;padding:10px 17px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 1px 2px rgba(16,24,40,.08)}
+  button.btn:hover{background:#244ae0}
+  button.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border);font-weight:600;box-shadow:none}
+  button.btn.ghost:hover{background:var(--panel2)}
+  button.btn.danger{background:#fff;color:var(--red);border:1px solid #f3c0c0;font-weight:600;box-shadow:none}
   table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--border)}
-  th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tbody tr:hover{background:var(--panel2)}
   .pos{color:var(--green)} .neg{color:var(--red)}
-  .pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;background:var(--panel2);color:var(--muted);border:1px solid var(--border)}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;background:var(--panel2);color:var(--muted);border:1px solid var(--border);font-weight:500}
   .muted{color:var(--muted)} .small{font-size:13px}
-  .bar-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .bar-row{display:flex;align-items:center;gap:10px;margin:7px 0}
   .bar-label{width:130px;font-size:13px;flex-shrink:0}
-  .bar-track{flex:1;background:var(--panel2);border-radius:6px;height:18px;overflow:hidden}
-  .bar-fill{height:100%;border-radius:6px;background:linear-gradient(90deg,var(--violet),var(--lime))}
+  .bar-track{flex:1;background:#eceef3;border-radius:7px;height:18px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:7px;background:linear-gradient(90deg,#2f56f0,#6366f1)}
   .bar-val{width:110px;text-align:right;font-size:13px;flex-shrink:0}
-  .progress{background:var(--panel2);border-radius:6px;height:10px;overflow:hidden;margin-top:6px}
-  .progress > div{height:100%;background:var(--lime)}
-  .icon-del{background:none;border:none;color:var(--red);cursor:pointer;font-size:15px}
-  .tip{background:rgba(179,136,255,.07);border:1px solid rgba(179,136,255,.28);border-radius:12px;padding:12px 14px;margin:10px 0;font-size:14px}
+  .progress{background:#eceef3;border-radius:7px;height:10px;overflow:hidden;margin-top:6px}
+  .progress > div{height:100%;background:var(--accent)}
+  .icon-del{background:none;border:none;color:#b6bcc7;cursor:pointer;font-size:15px}
+  .icon-del:hover{color:var(--red)}
+  .tip{background:var(--accent-soft);border:1px solid #d3ddfd;border-radius:12px;padding:12px 14px;margin:10px 0;font-size:14px;color:#2a3656}
   .empty{color:var(--muted);text-align:center;padding:24px;font-size:14px}
   .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .spacer{flex:1}
   hr{border:none;border-top:1px solid var(--border);margin:16px 0}
-  ::selection{background:var(--lime);color:#0a0a00}
+  ::selection{background:var(--accent-soft);color:var(--accent)}
 </style>
 </head>
 <body>
-<div id="lock" style="position:fixed;inset:0;background:#050506;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'Segoe UI',system-ui,Arial,sans-serif">
-  <form id="lockf" style="background:#0d0d0f;border:1px solid #27272b;border-radius:18px;padding:30px;width:330px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5)">
-    <div style="font-size:38px">🔒</div>
-    <h2 style="color:#e8e8ea;margin:10px 0 4px;font-size:20px">Mis Finanzas</h2>
-    <p style="color:#7d7d85;font-size:13px;margin:0 0 18px">Ingresa tu contraseña para ver el dashboard</p>
-    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:11px;border-radius:10px;border:1px solid #27272b;background:#161619;color:#e8e8ea;font-size:15px;box-sizing:border-box">
-    <div id="lockerr" style="color:#ef6a6a;font-size:13px;min-height:18px;margin:8px 0"></div>
-    <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:#b6f009;color:#0a0a00;font-weight:700;font-size:15px;cursor:pointer">Entrar</button>
+<div id="lock" style="position:fixed;inset:0;background:#f5f6f8;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif">
+  <form id="lockf" style="background:#fff;border:1px solid #e7e9ee;border-radius:18px;padding:32px;width:340px;text-align:center;box-shadow:0 10px 40px rgba(16,24,40,.10)">
+    <div style="width:52px;height:52px;margin:0 auto 14px;border-radius:15px;background:linear-gradient(135deg,#2f56f0,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:26px;box-shadow:0 6px 16px rgba(47,86,240,.35)">$</div>
+    <h2 style="color:#101729;margin:0 0 4px;font-size:20px;font-weight:700">Mis Finanzas</h2>
+    <p style="color:#697586;font-size:13px;margin:0 0 18px">Ingresa tu contraseña para ver el dashboard</p>
+    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border-radius:10px;border:1px solid #e7e9ee;background:#fff;color:#101729;font-size:15px;box-sizing:border-box">
+    <div id="lockerr" style="color:#e02424;font-size:13px;min-height:18px;margin:8px 0"></div>
+    <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:#2f56f0;color:#fff;font-weight:600;font-size:15px;cursor:pointer">Entrar</button>
   </form>
 </div>
 <header>
-  <div class="bot" aria-hidden="true">
-    <span class="ant l"></span><span class="ant r"></span>
-    <span class="ia">IA</span>
-    <span class="mouth"><i></i><span></span><i></i></span>
-  </div>
+  <div class="logo" aria-hidden="true">$</div>
   <div>
-    <h1>Mis Finanzas Personales</h1>
-    <p>Tu asesor financiero. Tus datos se guardan solo en este equipo · respáldalos desde «Respaldo».</p>
+    <h1>Mis Finanzas</h1>
+    <p>Tu asesor financiero personal · datos privados en tu equipo.</p>
   </div>
 </header>
 
@@ -363,8 +355,8 @@ function renderDashboard(){
     const ing=sumByType("ingreso",m), gas=sumByType("gasto",m);
     return `<div class="bar-row"><div class="bar-label">${monthLabel(m)}</div>
       <div class="bar-track" style="display:flex;flex-direction:column;gap:3px;height:auto;background:none">
-        <div class="bar-track"><div class="bar-fill" style="width:${ing/maxV*100}%;background:#34d399"></div></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${gas/maxV*100}%;background:#f87171"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${ing/maxV*100}%;background:#15a24a"></div></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${gas/maxV*100}%;background:#e02424"></div></div>
       </div>
       <div class="bar-val"><span class="pos">${clp(ing)}</span><br><span class="neg">${clp(gas)}</span></div></div>`;
   }).join("") : `<div class="empty">Aún no hay movimientos.</div>`;
@@ -383,7 +375,7 @@ function renderCreditCards(){
         <span class="pill">factura el ${c.billingDay} · próx. ${nextBilling(c.billingDay)}</span></div>
       <div style="margin:10px 0 4px"><span class="muted small">Utilizado</span>
         <div class="big neg" style="font-size:20px">${clp(util)}</div></div>
-      <div class="progress" style="height:12px"><div style="width:${pct}%;background:${alto?'linear-gradient(90deg,#fbbf24,#f87171)':'linear-gradient(90deg,#b388ff,#f87171)'}"></div></div>
+      <div class="progress" style="height:12px"><div style="width:${pct}%;background:${alto?'linear-gradient(90deg,#f59e0b,#e02424)':'linear-gradient(90deg,#2f56f0,#6366f1)'}"></div></div>
       <div class="flex small" style="justify-content:space-between;margin-top:6px">
         <span class="muted">Cupo: ${clp(cupo)}</span>
         <span>Disponible: <b class="pos">${clp(disp)}</b></span>
