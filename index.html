@@ -215,6 +215,12 @@
 
   <!-- ANALISIS -->
   <section id="analisis" class="section">
+    <div class="panel">
+      <h2>📅 Gastos por mes y categoría</h2>
+      <div class="flex"><label style="margin:0">Mes:</label>
+        <select id="an-mes" onchange="renderMesCat()" style="max-width:200px"></select></div>
+      <div id="an-mescat" style="margin-top:14px"></div>
+    </div>
     <div id="analisis-content"></div>
   </section>
 
@@ -335,8 +341,44 @@ document.getElementById("nav").addEventListener("click",e=>{
 
 /* ============ Render ============ */
 function renderAll(){
-  renderDashboard(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderAnalisis(); renderStorageInfo();
+  renderDashboard(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderMesCat(); renderAnalisis(); renderStorageInfo();
 }
+
+/* ====== Gastos por mes y categoría (con detalle) ====== */
+let mesCatExpand=null;
+function renderMesCat(){
+  const sel=document.getElementById("an-mes"); if(!sel) return;
+  const months=monthsSpan();
+  const prev=sel.value;
+  sel.innerHTML=months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
+  sel.value = months.includes(prev)?prev:(months[0]||"");
+  const mk=sel.value;
+  const cont=document.getElementById("an-mescat");
+  const totals={}, byCat={};
+  data.transactions.filter(t=>t.type==="gasto" && monthKey(t.date)===mk).forEach(t=>{
+    const c=t.category||"Otros";
+    totals[c]=(totals[c]||0)+t.amount;
+    (byCat[c]=byCat[c]||[]).push(t);
+  });
+  const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){ cont.innerHTML=`<div class="empty">Sin gastos en ${monthLabel(mk)}.</div>`; return; }
+  const tot=entries.reduce((s,e)=>s+e[1],0), max=Math.max(...entries.map(e=>e[1]));
+  cont.innerHTML=`<div class="small muted" style="margin-bottom:12px">Total gastos de <b>${monthLabel(mk)}</b>: <b style="color:var(--text)">${clp(tot)}</b> · toca una categoría para ver el detalle</div>`+
+  entries.map(([cat,val])=>{
+    const open=mesCatExpand===cat;
+    const det=open?`<div style="margin:2px 0 14px 8px;border-left:2px solid var(--border);padding-left:12px">${
+      byCat[cat].slice().sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(t=>
+       `<div class="flex small" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
+          <span>${t.date} · ${t.desc||""} <span class="muted">· ${accName(t.account)}</span></span>
+          <span class="neg" style="white-space:nowrap">${clp(t.amount)}</span></div>`).join("")}</div>`:"";
+    return `<div class="bar-row" style="cursor:pointer" onclick="toggleMesCat('${cat.replace(/'/g,"\\'")}')">
+        <div class="bar-label">${open?'▾':'▸'} ${cat}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${val/max*100}%"></div></div>
+        <div class="bar-val">${clp(val)} <span class="muted small">${Math.round(val/tot*100)}%</span></div>
+      </div>${det}`;
+  }).join("");
+}
+function toggleMesCat(cat){ mesCatExpand = (mesCatExpand===cat?null:cat); renderMesCat(); }
 
 function renderDashboard(){
   const mk=monthKey(todayStr());
