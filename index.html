@@ -188,6 +188,7 @@
           <option value="transferencia">Transferencias</option>
         </select>
         <select id="filter-month" onchange="renderTransactions()" style="max-width:180px"></select>
+        <select id="filter-category" onchange="renderTransactions()" style="max-width:200px"></select>
       </div>
       <div id="mv-list"></div>
     </div>
@@ -499,13 +500,24 @@ function fillMonthFilter(){
   sel.value=cur;
 }
 
+function fillCategoryFilter(){
+  const sel=document.getElementById("filter-category");
+  const cur=sel.value;
+  const cats=[...new Set(data.transactions.filter(t=>t.category).map(t=>t.category))].sort();
+  sel.innerHTML=`<option value="">Todas las categorías</option>`+cats.map(c=>`<option value="${c}">${c}</option>`).join("");
+  sel.value=cats.includes(cur)?cur:"";
+}
+
 function renderTransactions(){
   fillMonthFilter();
+  fillCategoryFilter();
   const ft=document.getElementById("filter-type").value;
   const fm=document.getElementById("filter-month").value;
+  const fc=document.getElementById("filter-category").value;
   let list=[...data.transactions].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
   if(ft) list=list.filter(t=>t.type===ft);
   if(fm) list=list.filter(t=>monthKey(t.date)===fm);
+  if(fc) list=list.filter(t=>t.category===fc);
   if(!list.length){ document.getElementById("mv-list").innerHTML=`<div class="empty">Sin movimientos para este filtro.</div>`; return; }
   const rows=list.map(t=>{
     let detalle, montoCls, signo;
