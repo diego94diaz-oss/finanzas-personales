@@ -128,12 +128,17 @@
     <div class="panel">
       <h2>Mis cuentas y efectivo</h2>
       <div id="cuentas-list"></div>
-      <hr>
+    </div>
+    <div class="panel">
+      <h2>💳 Cupos de tarjetas de crédito</h2>
+      <div id="cuentas-tarjetas"></div>
+    </div>
+    <div class="panel">
       <h2>Agregar cuenta</h2>
       <div class="row">
         <div><label>Nombre</label><input id="acc-name" placeholder="Ej: Banco Falabella"></div>
         <div><label>Tipo</label><select id="acc-type"><option value="banco">Cuenta bancaria</option><option value="efectivo">Efectivo</option></select></div>
-        <div><label>Saldo inicial (CLP)</label><input id="acc-initial" type="number" placeholder="0"></div>
+        <div><label>Saldo actual (opcional)</label><input id="acc-initial" type="number" placeholder="0"></div>
         <div><button class="btn" onclick="addAccount()">Agregar</button></div>
       </div>
     </div>
@@ -399,20 +404,38 @@ function catBars(mk){
 }
 
 function renderAccounts(){
-  const rows=data.accounts.map(a=>{
+  // Cuentas normales (no tarjetas): muestran saldo actual
+  const cuentas=data.accounts.filter(a=>!a.card);
+  const rows=cuentas.map(a=>{
     const bal=accountBalance(a.id);
     return `<tr>
       <td>${a.type==="efectivo"?"💵":"🏦"} ${a.name}</td>
-      <td><span class="pill">${a.type==="efectivo"?"Efectivo":"Banco"}</span></td>
-      <td>Saldo inicial: <input type="number" value="${a.initial}" style="width:130px;display:inline-block"
-          onchange="updateInitial('${a.id}',this.value)"></td>
+      <td><span class="pill">${a.type==="efectivo"?"Efectivo":"Cuenta bancaria"}</span></td>
       <td class="${bal>=0?'pos':'neg'}" style="font-weight:600;text-align:right">${clp(bal)}</td>
       <td style="text-align:right"><button class="icon-del" onclick="delAccount('${a.id}')" title="Eliminar">✕</button></td>
     </tr>`;
   }).join("");
   document.getElementById("cuentas-list").innerHTML=
-    `<table><thead><tr><th>Cuenta</th><th>Tipo</th><th>Saldo inicial</th><th style="text-align:right">Saldo actual</th><th></th></tr></thead>
+    `<table><thead><tr><th>Cuenta</th><th>Tipo</th><th style="text-align:right">Saldo actual</th><th></th></tr></thead>
      <tbody>${rows}</tbody></table>`;
+
+  // Tarjetas de crédito: cupo utilizado y disponible (sin "saldo")
+  const cards=data.accounts.filter(a=>a.card);
+  const cwrap=document.getElementById("cuentas-tarjetas");
+  if(cwrap){
+    cwrap.innerHTML = cards.length ? `<table><thead><tr><th>Tarjeta de crédito</th>
+       <th style="text-align:right">Cupo utilizado</th><th style="text-align:right">Cupo disponible</th>
+       <th style="text-align:right">Cupo total</th><th></th></tr></thead><tbody>${cards.map(c=>{
+        const cupo=c.cupo||0, util=c.utilizado||0, disp=cupo-util;
+        return `<tr>
+          <td>💳 ${c.name}</td>
+          <td class="neg" style="text-align:right;font-weight:600">${clp(util)}</td>
+          <td class="pos" style="text-align:right;font-weight:600">${clp(disp)}</td>
+          <td style="text-align:right" class="muted">${clp(cupo)}</td>
+          <td style="text-align:right"><button class="icon-del" onclick="delAccount('${c.id}')" title="Eliminar">✕</button></td>
+        </tr>`;}).join("")}</tbody></table>`
+      : `<div class="empty">No hay tarjetas de crédito registradas.</div>`;
+  }
   fillAccountSelects();
 }
 
