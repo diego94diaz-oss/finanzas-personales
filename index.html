@@ -78,6 +78,36 @@
   .spacer{flex:1}
   hr{border:none;border-top:1px solid var(--border);margin:18px 0}
   ::selection{background:var(--lilac);color:var(--accent)}
+
+  /* Las tablas se generan dinámicamente: su contenedor permite scroll horizontal */
+  div:has(> table){overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* ============ Móvil ============ */
+  @media (max-width:640px){
+    body{font-size:14px}
+    header{padding:16px 16px 10px;gap:12px}
+    .logo{width:40px;height:40px;font-size:19px}
+    header h1{font-size:20px}
+    header p{font-size:12px}
+    nav{flex-wrap:nowrap;overflow-x:auto;padding:10px 12px;gap:5px;scrollbar-width:none}
+    nav::-webkit-scrollbar{display:none}
+    nav button{flex-shrink:0;padding:8px 14px;font-size:13px}
+    main{padding:16px 12px}
+    .panel{padding:18px 16px;border-radius:24px;margin-bottom:14px}
+    .panel h2{font-size:18px}
+    .card{padding:16px;border-radius:22px}
+    .card .big{font-size:22px}
+    .cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+    .grid{gap:10px}
+    .row{grid-template-columns:1fr 1fr}
+    .row > div:has(button){grid-column:1/-1}
+    table{font-size:13px}
+    th,td{padding:8px 6px;white-space:nowrap}
+    .flex select{max-width:100% !important;flex:1;min-width:130px}
+    .bar-label{width:92px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bar-val{width:88px;font-size:12px}
+    button.btn{padding:11px 18px;font-size:13px;width:auto}
+  }
 </style>
 </head>
 <body>
