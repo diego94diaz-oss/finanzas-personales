@@ -5,86 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mis Finanzas Personales</title>
 <script src="datos_cifrados.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f5f6f8; --panel:#ffffff; --panel2:#f3f4f7; --text:#101729; --muted:#697586;
-    --accent:#2f56f0; --accent-soft:#eaeefe; --green:#15a24a; --red:#e02424; --amber:#d97706;
-    --violet:#6366f1; --border:#e7e9ee;
-    --shadow:0 1px 2px rgba(16,24,40,.04),0 6px 20px rgba(16,24,40,.06);
+    --bg:#fbfbfd; --panel:#ffffff; --panel2:#f5f6f9; --text:#0c1424; --muted:#6b7689;
+    --accent:#2348ff; --accent-soft:#eef1ff; --green:#12a150; --red:#e0252b; --amber:#d97706;
+    --violet:#6366f1; --border:#edeef2;
+    --shadow:0 1px 3px rgba(16,24,40,.03),0 10px 30px rgba(16,24,40,.05);
   }
   *{box-sizing:border-box}
   body{
-    margin:0;font-family:"Inter","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+    margin:0;font-family:"Plus Jakarta Sans","Inter","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
     color:var(--text);font-size:15px;background:var(--bg);-webkit-font-smoothing:antialiased;
   }
   header{
-    display:flex;align-items:center;gap:14px;padding:18px 24px;background:var(--panel);
+    display:flex;align-items:center;gap:15px;padding:22px 28px;background:var(--panel);
     border-bottom:1px solid var(--border);
   }
-  .logo{width:44px;height:44px;flex-shrink:0;border-radius:13px;
-    background:linear-gradient(135deg,#2f56f0,#6366f1);display:flex;align-items:center;
-    justify-content:center;color:#fff;font-weight:800;font-size:22px;
-    box-shadow:0 6px 16px rgba(47,86,240,.35)}
-  header h1{margin:0;font-size:20px;letter-spacing:-.2px;font-weight:700}
-  header p{margin:3px 0 0;color:var(--muted);font-size:13px}
-  nav{display:flex;gap:4px;flex-wrap:wrap;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);
-    padding:10px 16px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
-  nav button{background:transparent;border:none;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:500}
+  .logo{width:46px;height:46px;flex-shrink:0;border-radius:15px;
+    background:linear-gradient(135deg,#2348ff,#5b73ff);display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:800;font-size:23px;
+    box-shadow:0 8px 20px rgba(35,72,255,.35)}
+  header h1{margin:0;font-size:21px;letter-spacing:-.4px;font-weight:800}
+  header p{margin:3px 0 0;color:var(--muted);font-size:13px;font-weight:500}
+  nav{display:flex;gap:6px;flex-wrap:wrap;background:rgba(255,255,255,.8);backdrop-filter:blur(10px);
+    padding:12px 20px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
+  nav button{background:transparent;border:none;color:var(--muted);padding:9px 16px;border-radius:999px;cursor:pointer;font-size:14px;font-weight:600}
   nav button:hover{background:var(--panel2);color:var(--text)}
-  nav button.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
-  main{padding:22px;max-width:1120px;margin:0 auto}
+  nav button.active{background:var(--accent);color:#fff;box-shadow:0 4px 12px rgba(35,72,255,.28)}
+  main{padding:26px 22px;max-width:1140px;margin:0 auto}
   .section{display:none}
   .section.active{display:block}
-  .grid{display:grid;gap:14px}
-  .cards{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:16px}
+  .cards{grid-template-columns:repeat(auto-fit,minmax(205px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:20px;box-shadow:var(--shadow)}
   .card h3{margin:0 0 8px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
-  .card .big{font-size:25px;font-weight:700;letter-spacing:-.5px}
-  .panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
-  .panel h2{margin:0 0 14px;font-size:17px;font-weight:700;letter-spacing:-.2px}
-  label{display:block;font-size:13px;color:var(--muted);margin:0 0 5px;font-weight:500}
-  input,select,textarea{width:100%;padding:10px 12px;background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit}
+  .card .big{font-size:26px;font-weight:800;letter-spacing:-.8px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:24px;margin-bottom:18px;box-shadow:var(--shadow)}
+  .panel h2{margin:0 0 16px;font-size:18px;font-weight:800;letter-spacing:-.4px}
+  label{display:block;font-size:13px;color:var(--muted);margin:0 0 5px;font-weight:600}
+  input,select,textarea{width:100%;padding:11px 14px;background:var(--panel);border:1px solid var(--border);border-radius:12px;color:var(--text);font-size:14px;font-family:inherit}
   textarea{resize:vertical;line-height:1.4}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(47,86,240,.13)}
-  .row{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end}
-  button.btn{background:var(--accent);color:#fff;border:none;padding:10px 17px;border-radius:10px;font-weight:600;cursor:pointer;font-size:14px;box-shadow:0 1px 2px rgba(16,24,40,.08)}
-  button.btn:hover{background:#244ae0}
-  button.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border);font-weight:600;box-shadow:none}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(35,72,255,.14)}
+  .row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));align-items:end}
+  button.btn{background:var(--accent);color:#fff;border:none;padding:11px 22px;border-radius:999px;font-weight:700;cursor:pointer;font-size:14px;box-shadow:0 6px 16px rgba(35,72,255,.25)}
+  button.btn:hover{background:#1a3aee;box-shadow:0 8px 20px rgba(35,72,255,.32)}
+  button.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border);font-weight:700;box-shadow:none}
   button.btn.ghost:hover{background:var(--panel2)}
-  button.btn.danger{background:#fff;color:var(--red);border:1px solid #f3c0c0;font-weight:600;box-shadow:none}
+  button.btn.danger{background:#fff;color:var(--red);border:1px solid #f3c0c0;font-weight:700;box-shadow:none}
   table{width:100%;border-collapse:collapse;font-size:14px}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+  th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--border)}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
   tbody tr:hover{background:var(--panel2)}
   .pos{color:var(--green)} .neg{color:var(--red)}
-  .pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;background:var(--panel2);color:var(--muted);border:1px solid var(--border);font-weight:500}
+  .pill{display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;background:var(--panel2);color:var(--muted);border:1px solid var(--border);font-weight:600}
   .muted{color:var(--muted)} .small{font-size:13px}
   .bar-row{display:flex;align-items:center;gap:10px;margin:7px 0}
   .bar-label{width:130px;font-size:13px;flex-shrink:0}
-  .bar-track{flex:1;background:#eceef3;border-radius:7px;height:18px;overflow:hidden}
-  .bar-fill{height:100%;border-radius:7px;background:linear-gradient(90deg,#2f56f0,#6366f1)}
+  .bar-track{flex:1;background:#edeef3;border-radius:8px;height:18px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,#2348ff,#6366f1)}
   .bar-val{width:110px;text-align:right;font-size:13px;flex-shrink:0}
-  .progress{background:#eceef3;border-radius:7px;height:10px;overflow:hidden;margin-top:6px}
+  .progress{background:#edeef3;border-radius:8px;height:10px;overflow:hidden;margin-top:6px}
   .progress > div{height:100%;background:var(--accent)}
   .icon-del{background:none;border:none;color:#b6bcc7;cursor:pointer;font-size:15px}
   .icon-del:hover{color:var(--red)}
-  .tip{background:var(--accent-soft);border:1px solid #d3ddfd;border-radius:12px;padding:12px 14px;margin:10px 0;font-size:14px;color:#2a3656}
-  .empty{color:var(--muted);text-align:center;padding:24px;font-size:14px}
+  .tip{background:var(--accent-soft);border:1px solid #dbe1ff;border-radius:14px;padding:13px 16px;margin:10px 0;font-size:14px;color:#27324e}
+  .empty{color:var(--muted);text-align:center;padding:26px;font-size:14px}
   .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .spacer{flex:1}
-  hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+  hr{border:none;border-top:1px solid var(--border);margin:18px 0}
   ::selection{background:var(--accent-soft);color:var(--accent)}
 </style>
 </head>
 <body>
-<div id="lock" style="position:fixed;inset:0;background:#f5f6f8;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'Inter','Segoe UI',system-ui,Arial,sans-serif">
-  <form id="lockf" style="background:#fff;border:1px solid #e7e9ee;border-radius:18px;padding:32px;width:340px;text-align:center;box-shadow:0 10px 40px rgba(16,24,40,.10)">
-    <div style="width:52px;height:52px;margin:0 auto 14px;border-radius:15px;background:linear-gradient(135deg,#2f56f0,#6366f1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:26px;box-shadow:0 6px 16px rgba(47,86,240,.35)">$</div>
-    <h2 style="color:#101729;margin:0 0 4px;font-size:20px;font-weight:700">Mis Finanzas</h2>
-    <p style="color:#697586;font-size:13px;margin:0 0 18px">Ingresa tu contraseña para ver el dashboard</p>
-    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:12px;border-radius:10px;border:1px solid #e7e9ee;background:#fff;color:#101729;font-size:15px;box-sizing:border-box">
-    <div id="lockerr" style="color:#e02424;font-size:13px;min-height:18px;margin:8px 0"></div>
-    <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:#2f56f0;color:#fff;font-weight:600;font-size:15px;cursor:pointer">Entrar</button>
+<div id="lock" style="position:fixed;inset:0;background:#fbfbfd;display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'Plus Jakarta Sans','Inter','Segoe UI',system-ui,Arial,sans-serif">
+  <form id="lockf" style="background:#fff;border:1px solid #edeef2;border-radius:24px;padding:34px;width:344px;text-align:center;box-shadow:0 16px 50px rgba(16,24,40,.10)">
+    <div style="width:54px;height:54px;margin:0 auto 16px;border-radius:16px;background:linear-gradient(135deg,#2348ff,#5b73ff);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:27px;box-shadow:0 8px 20px rgba(35,72,255,.35)">$</div>
+    <h2 style="color:#0c1424;margin:0 0 4px;font-size:21px;font-weight:800">Mis Finanzas</h2>
+    <p style="color:#6b7689;font-size:13px;margin:0 0 20px">Ingresa tu contraseña para ver el dashboard</p>
+    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:13px;border-radius:12px;border:1px solid #edeef2;background:#fff;color:#0c1424;font-size:15px;box-sizing:border-box">
+    <div id="lockerr" style="color:#e0252b;font-size:13px;min-height:18px;margin:9px 0"></div>
+    <button type="submit" style="width:100%;padding:13px;border:none;border-radius:999px;background:#2348ff;color:#fff;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(35,72,255,.28)">Entrar</button>
   </form>
 </div>
 <header>
@@ -380,7 +383,7 @@ function renderCreditCards(){
         <span class="pill">factura el ${c.billingDay} · próx. ${nextBilling(c.billingDay)}</span></div>
       <div style="margin:10px 0 4px"><span class="muted small">Utilizado</span>
         <div class="big neg" style="font-size:20px">${clp(util)}</div></div>
-      <div class="progress" style="height:12px"><div style="width:${pct}%;background:${alto?'linear-gradient(90deg,#f59e0b,#e02424)':'linear-gradient(90deg,#2f56f0,#6366f1)'}"></div></div>
+      <div class="progress" style="height:12px"><div style="width:${pct}%;background:${alto?'linear-gradient(90deg,#f59e0b,#e02424)':'linear-gradient(90deg,#2348ff,#6366f1)'}"></div></div>
       <div class="flex small" style="justify-content:space-between;margin-top:6px">
         <span class="muted">Cupo: ${clp(cupo)}</span>
         <span>Disponible: <b class="pos">${clp(disp)}</b></span>
