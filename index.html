@@ -404,8 +404,8 @@ function catBars(mk){
 }
 
 function renderAccounts(){
-  // Cuentas normales (no tarjetas): muestran saldo actual
-  const cuentas=data.accounts.filter(a=>!a.card);
+  // Cuentas normales (no tarjetas, no la cuenta puente técnica): muestran saldo actual
+  const cuentas=data.accounts.filter(a=>!a.card && a.name!=="Movimientos internos");
   const rows=cuentas.map(a=>{
     const bal=accountBalance(a.id);
     return `<tr>
