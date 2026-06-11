@@ -155,17 +155,6 @@
   <!-- DASHBOARD -->
   <section id="dashboard" class="section active">
     <div class="grid cards" id="dash-cards"></div>
-    <div class="panel">
-      <h2>⚡ Registro rápido de gasto</h2>
-      <div class="row">
-        <div><label>Monto (CLP)</label><input id="quick-amount" type="number" placeholder="0" inputmode="numeric"></div>
-        <div><label>Categoría</label><select id="quick-cat"></select></div>
-        <div><label>Cuenta / medio</label><select id="quick-acc"></select></div>
-        <div><label>Descripción (opcional)</label><input id="quick-desc" placeholder="Ej: almuerzo"></div>
-        <div><button class="btn" onclick="quickAdd()">Anotar</button></div>
-      </div>
-      <span id="quick-result" class="small pos"></span>
-    </div>
     <div class="panel" id="dash-pagos-panel">
       <h2>📆 Próximos pagos</h2>
       <div id="dash-pagos"></div>
@@ -453,20 +442,6 @@ function toggleTheme(){
   localStorage.setItem("finanzas_theme",cur); applyTheme(cur);
 }
 
-/* ============ Registro rápido ============ */
-function quickAdd(){
-  const amount=Number(document.getElementById("quick-amount").value);
-  if(!amount||amount<=0){ alert("Ingresa un monto válido."); return; }
-  data.transactions.push({id:uid(),type:"gasto",amount,date:todayStr(),
-    account:document.getElementById("quick-acc").value,
-    category:document.getElementById("quick-cat").value,
-    desc:document.getElementById("quick-desc").value.trim()||"Gasto rápido"});
-  document.getElementById("quick-amount").value=""; document.getElementById("quick-desc").value="";
-  save(); renderAll();
-  document.getElementById("quick-result").textContent="✓ Gasto anotado";
-  setTimeout(()=>{const e=document.getElementById("quick-result"); if(e) e.textContent="";},2500);
-}
-
 /* ============ Próximos pagos ============ */
 function renderUpcoming(){
   const hoy=new Date(); const items=[];
@@ -745,12 +720,6 @@ function fillAccountSelects(){
   document.getElementById("mv-account").innerHTML=opts;
   document.getElementById("mv-to").innerHTML=opts;
   document.getElementById("mv-category").innerHTML=CATS.map(c=>`<option>${c}</option>`).join("");
-  // registro rápido (mantener selección)
-  const qa=document.getElementById("quick-acc"), qc=document.getElementById("quick-cat");
-  if(qa){ const cur=qa.value;
-    qa.innerHTML=data.accounts.filter(a=>a.name!=="Movimientos internos").map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
-    if(cur) qa.value=cur; }
-  if(qc){ const cur=qc.value; qc.innerHTML=CATS.map(c=>`<option>${c}</option>`).join(""); if(cur) qc.value=cur; }
 }
 
 /* ============ Presupuesto mensual por categoría ============ */
