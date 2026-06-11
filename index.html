@@ -594,21 +594,45 @@ function toggleMesCat(cat){ mesCatExpand = (mesCatExpand===cat?null:cat); render
 function inversionesTotal(){
   return data.transactions.filter(t=>t.type==="gasto"&&t.category==="Inversiones").reduce((s,t)=>s+t.amount,0);
 }
+
+/* Portafolio de inversiones (dashboard hermano en el mismo dominio) */
+let PORTFOLIO_CLP=null, PORTFOLIO_LIVE=false;
+function portfolioValue(){
+  return PORTFOLIO_CLP || (data.meta&&data.meta.portfolioCLP) || null;
+}
+async function fetchPortfolio(){
+  try{
+    const r=await fetch("https://diego94diaz-oss.github.io/portfolio-dashboard/",{cache:"no-store"});
+    const txt=await r.text();
+    const usd=parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+    const clpHold=parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+    let rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
+    try{
+      const fx=await fetch("https://open.er-api.com/v6/latest/USD");
+      const d=await fx.json(); if(d&&d.rates&&d.rates.CLP) rate=d.rates.CLP;
+    }catch(e){}
+    if(usd&&clpHold){ PORTFOLIO_CLP=Math.round(clpHold+usd*rate); PORTFOLIO_LIVE=true; renderDashboard(); }
+  }catch(e){ /* sin conexión o file://: se usa el valor guardado */ }
+}
+
 function renderDashboard(){
   const mk=monthKey(todayStr());
   const ingMes=sumByType("ingreso",mk), gasMes=sumByType("gasto",mk);
   const ahorro=ingMes-gasMes;
-  const patrimonio=totalBalance()+inversionesTotal()-totalDebt();
+  const inv=portfolioValue();
+  const patrimonio=totalBalance()+(inv!==null?inv:inversionesTotal())-totalDebt();
   const cards=[
     {h:"Saldo total (líquido)",v:clp(totalBalance()),c:""},
     {h:"Ingresos del mes",v:clp(ingMes),c:"pos"},
     {h:"Gastos del mes",v:clp(gasMes),c:"neg"},
     {h:"Balance del mes",v:clp(ahorro),c:ahorro>=0?"pos":"neg"},
     {h:"Deuda total",v:clp(totalDebt()),c:totalDebt()>0?"neg":"pos"},
-    {h:"Patrimonio neto",v:clp(patrimonio),c:patrimonio>=0?"pos":"neg"},
+    {h:"Inversiones (portafolio)",v:inv!==null?clp(inv):clp(inversionesTotal()),c:"pos",
+     s:inv!==null?(PORTFOLIO_LIVE?"USD+CLP · en línea":"USD+CLP · último valor conocido"):"aportes registrados"},
+    {h:"Patrimonio neto",v:clp(patrimonio),c:patrimonio>=0?"pos":"neg",s:"líquido + inversiones − deudas"},
   ];
   document.getElementById("dash-cards").innerHTML=cards.map(c=>
-    `<div class="card"><h3>${c.h}</h3><div class="big ${c.c}">${c.v}</div></div>`).join("");
+    `<div class="card"><h3>${c.h}</h3><div class="big ${c.c}">${c.v}</div>${c.s?`<div class="small muted" style="margin-top:4px">${c.s}</div>`:""}</div>`).join("");
 
   renderCreditCards();
   renderUpcoming();
@@ -1314,6 +1338,7 @@ applyTheme(localStorage.getItem("finanzas_theme")||"light");
 document.getElementById("mv-date").value=todayStr();
 onTypeChange();
 renderAll();
+fetchPortfolio();
 </script>
 <script>
 (function(){
