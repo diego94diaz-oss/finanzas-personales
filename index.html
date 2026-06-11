@@ -854,13 +854,14 @@ function renderSubs(){
       <option value="activas" ${subsFilterVal==="activas"?"selected":""}>Solo activas</option>
       <option value="inactivas" ${subsFilterVal==="inactivas"?"selected":""}>Solo inactivas</option>
     </select></div>
-  ${entries.length?`<table><thead><tr><th>Activa</th><th>Servicio</th><th style="text-align:right">Valor/mes</th><th style="text-align:right">Al año</th><th style="text-align:right">Pagos</th></tr></thead><tbody>
+  ${entries.length?`<table><thead><tr><th>Activa</th><th>Servicio</th><th style="text-align:right">Valor/mes</th><th style="text-align:right">Al año</th><th>Último pago</th><th style="text-align:right">Pagos</th></tr></thead><tbody>
   ${entries.map(([k,v])=>{const ina=!!off[k];return `<tr style="${ina?'opacity:.5':''}">
     <td><label style="display:inline-flex;align-items:center;cursor:pointer;margin:0">
       <input type="checkbox" ${ina?"":"checked"} onchange="toggleSub('${k.replace(/'/g,"\\'")}')" style="width:auto;accent-color:var(--accent);transform:scale(1.25);cursor:pointer"></label></td>
     <td style="${ina?'text-decoration:line-through':''}">${v.nombre}</td>
     <td style="text-align:right">${clp(v.monto)}</td>
     <td style="text-align:right" class="muted">${clp(v.monto*12)}</td>
+    <td class="muted">${v.last||"—"}</td>
     <td style="text-align:right" class="muted">${v.n}</td></tr>`;}).join("")}
   </tbody></table>`:`<div class="empty">Nada que mostrar con este filtro.</div>`}
   <div class="tip" style="margin-top:10px">💡 Desmarca las que canceles: salen del costo mensual y se acumulan como ahorro anual.</div>`;
