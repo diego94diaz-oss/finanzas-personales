@@ -974,9 +974,10 @@ function renderTransactions(){
     else if(t.type==="gasto"){ detalle=accName(t.account); montoCls="neg"; signo="−"; }
     else { detalle=accName(t.account)+" → "+accName(t.to); montoCls="muted"; signo=""; }
     const tipoPill={ingreso:"Ingreso",gasto:"Gasto",transferencia:"Transfer."}[t.type];
+    const tipoCol={ingreso:"#0e9f6e",gasto:"#e0252b",transferencia:"#2596be"}[t.type];
     return `<tr>
       <td>${t.date||""}</td>
-      <td><span class="pill">${tipoPill}</span></td>
+      <td><span class="pill" style="background:${tipoCol}1f;color:${tipoCol}">${tipoPill}</span></td>
       <td>${t.type==="gasto"?catChip(t.category||"Otros"):(t.type==="ingreso"?catChip(t.category||"Ingreso"):"—")}</td>
       <td>${detalle}</td>
       <td>${t.desc||""}</td>
