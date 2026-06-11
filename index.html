@@ -342,9 +342,20 @@ function load(){
     // Carga inicial automática (datos consolidados de cartolas). Se aplica una sola
     // vez por versión; luego manda lo guardado por el usuario en este navegador.
     if(window.FINANZAS_SEED && localStorage.getItem("finanzas_seed_version")!==window.FINANZAS_SEED_VERSION){
-      localStorage.setItem(KEY, JSON.stringify(window.FINANZAS_SEED));
+      const seed=JSON.parse(JSON.stringify(window.FINANZAS_SEED));
+      // conservar preferencias del usuario al actualizar los datos publicados
+      try{
+        const prev=JSON.parse(localStorage.getItem(KEY)||"null");
+        if(prev&&prev.meta){
+          seed.meta=seed.meta||{};
+          if(prev.meta.budgets) seed.meta.budgets=prev.meta.budgets;
+          if(prev.meta.emergencyGoal) seed.meta.emergencyGoal=prev.meta.emergencyGoal;
+          if(prev.meta.subsOff) seed.meta.subsOff=prev.meta.subsOff;
+        }
+      }catch(e){}
+      localStorage.setItem(KEY, JSON.stringify(seed));
       localStorage.setItem("finanzas_seed_version", window.FINANZAS_SEED_VERSION);
-      return JSON.parse(JSON.stringify(window.FINANZAS_SEED));
+      return seed;
     }
     const raw=localStorage.getItem(KEY); if(raw) return JSON.parse(raw);
   }catch(e){}
@@ -1397,6 +1408,7 @@ fetchPortfolio();
             if(localObj.meta){
               if(localObj.meta.budgets) bundled.meta.budgets=localObj.meta.budgets;
               if(localObj.meta.emergencyGoal) bundled.meta.emergencyGoal=localObj.meta.emergencyGoal;
+              if(localObj.meta.subsOff) bundled.meta.subsOff=localObj.meta.subsOff;
             }
             obj=bundled;
           }
