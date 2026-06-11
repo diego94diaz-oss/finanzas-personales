@@ -43,7 +43,7 @@
   nav{display:flex;gap:6px;flex-wrap:wrap;background:var(--nav-bg);backdrop-filter:blur(10px);
     padding:12px 20px;position:sticky;top:0;z-index:10;border-bottom:1px solid var(--border)}
   nav button{background:transparent;border:none;color:var(--muted);padding:9px 17px;border-radius:999px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit}
-  nav button:hover{background:#fff;color:var(--text)}
+  nav button:hover{background:var(--panel);color:var(--text)}
   nav button.active{background:var(--accent);color:#fff;box-shadow:0 4px 14px rgba(89,52,197,.30)}
   main{padding:26px 22px;max-width:1140px;margin:0 auto}
   .section{display:none}
@@ -65,7 +65,7 @@
   button.btn:hover{background:#4a28ad;box-shadow:0 8px 20px rgba(89,52,197,.34)}
   button.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--border);font-weight:700;box-shadow:none}
   button.btn.ghost:hover{background:var(--panel2)}
-  button.btn.danger{background:#fff;color:var(--red);border:1px solid #f3c0c0;font-weight:700;box-shadow:none}
+  button.btn.danger{background:var(--panel);color:var(--red);border:1px solid var(--border);font-weight:700;box-shadow:none}
   table{width:100%;border-collapse:collapse;font-size:14px}
   th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--border)}
   th{color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
@@ -83,7 +83,6 @@
   .icon-del{background:none;border:none;color:#c7c3c0;cursor:pointer;font-size:15px}
   .icon-del:hover{color:var(--red)}
   .tip{background:var(--accent-soft);border:none;border-radius:18px;padding:14px 18px;margin:10px 0;font-size:14px;color:var(--text)}
-  nav button:hover{background:var(--panel)}
   .empty{color:var(--muted);text-align:center;padding:26px;font-size:14px}
   .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .spacer{flex:1}
@@ -355,7 +354,7 @@ function save(){ if(window.saveEnc) window.saveEnc(); }
 
 /* ============ Utilidades ============ */
 function clp(n){ n=Math.round(n||0); return (n<0?"-$":"$")+Math.abs(n).toLocaleString("es-CL"); }
-function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function monthKey(dateStr){ return (dateStr||"").slice(0,7); }
 function monthLabel(key){
   if(!key) return "";
@@ -508,8 +507,8 @@ function renderDeudaEvo(){
   let cards=cardDebt();
   for(let k=0;k<N;k++){
     const tot=cred.filter(c=>!c.incluidoEn).reduce((s,c)=>s+c.saldo,0)+cards;
-    const d=new Date(); d.setMonth(d.getMonth()-k);
-    serie.push({mes:monthKey(d.toISOString()),total:Math.round(tot)});
+    const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-k);
+    serie.push({mes:d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),total:Math.round(tot)});
     // deshacer un mes
     cred.forEach(c=>{
       if(c.pagadas>0){
@@ -803,7 +802,6 @@ function setBudget(cat,val){
 }
 
 /* ============ Gráfico de torta ============ */
-const PIE_COLORS=["#5934c5","#7b63f5","#ff914d","#ffd55d","#ff93ab","#34c98a","#46b5d1","#d7befc","#eacdff","#ffc7c3","#a3e635","#94a3b8","#c2845a"];
 function renderPie(){
   const el=document.getElementById("an-pie"); if(!el) return;
   const mk=monthKey(todayStr());
@@ -1052,7 +1050,7 @@ function renderCredito(d){
 }
 
 function mesNombre(offset){
-  const t=new Date(); t.setMonth(t.getMonth()+offset);
+  const t=new Date(); t.setDate(1); t.setMonth(t.getMonth()+offset);
   const m=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
   return m[t.getMonth()]+" "+t.getFullYear();
 }
@@ -1200,7 +1198,6 @@ function addAccount(){
   document.getElementById("acc-name").value=""; document.getElementById("acc-initial").value="";
   save(); renderAll();
 }
-function updateInitial(id,val){ const a=data.accounts.find(x=>x.id===id); if(a){ a.initial=Number(val)||0; save(); renderAll(); } }
 function delAccount(id){
   const used=data.transactions.some(t=>t.account===id||t.to===id);
   if(used){ alert("No puedes eliminar esta cuenta porque tiene movimientos asociados."); return; }
