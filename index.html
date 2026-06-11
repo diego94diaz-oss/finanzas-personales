@@ -816,27 +816,54 @@ function renderComparador(){
 }
 
 /* ============ Suscripciones ============ */
+let subsFilterVal="todas";
+function subKey(desc){ return (desc||"suscripción").toLowerCase().replace(/^compra\s+/,"").trim(); }
+function subNice(desc){ return (desc||"Suscripción").replace(/^COMPRA\s+/i,"").trim(); }
+function toggleSub(key){
+  if(!data.meta) data.meta={};
+  if(!data.meta.subsOff) data.meta.subsOff={};
+  if(data.meta.subsOff[key]) delete data.meta.subsOff[key]; else data.meta.subsOff[key]=true;
+  save(); renderSubs();
+}
+function setSubsFilter(v){ subsFilterVal=v; renderSubs(); }
 function renderSubs(){
   const el=document.getElementById("an-subs"); if(!el) return;
+  const off=(data.meta&&data.meta.subsOff)||{};
   const subs={};
   data.transactions.filter(t=>t.type==="gasto"&&t.category==="Suscripciones").forEach(t=>{
-    const k=t.desc||"Suscripción";
-    (subs[k]=subs[k]||{n:0,tot:0,last:""}).n++;
+    const k=subKey(t.desc);
+    (subs[k]=subs[k]||{n:0,tot:0,last:"",nombre:subNice(t.desc)}).n++;
     subs[k].tot+=t.amount;
-    if((t.date||"")>subs[k].last){ subs[k].last=t.date; subs[k].monto=t.amount; }
+    if((t.date||"")>subs[k].last){ subs[k].last=t.date; subs[k].monto=t.amount; subs[k].nombre=subNice(t.desc); }
   });
-  const entries=Object.entries(subs).sort((a,b)=>b[1].monto-a[1].monto);
+  let entries=Object.entries(subs).sort((a,b)=>b[1].monto-a[1].monto);
   if(!entries.length){ el.innerHTML=`<div class="empty">No hay gastos en la categoría Suscripciones.</div>`; return; }
-  const mensual=entries.reduce((s,[,v])=>s+v.monto,0);
+  const activas=entries.filter(([k])=>!off[k]);
+  const mensual=activas.reduce((s,[,v])=>s+v.monto,0);
+  const ahorroInact=entries.filter(([k])=>off[k]).reduce((s,[,v])=>s+v.monto,0);
+  if(subsFilterVal==="activas") entries=entries.filter(([k])=>!off[k]);
+  else if(subsFilterVal==="inactivas") entries=entries.filter(([k])=>off[k]);
   el.innerHTML=`<div class="grid cards" style="margin-bottom:12px">
-    <div class="card"><h3>Costo mensual</h3><div class="big neg">${clp(mensual)}</div></div>
+    <div class="card"><h3>Costo mensual (activas)</h3><div class="big neg">${clp(mensual)}</div></div>
     <div class="card"><h3>Costo anual proyectado</h3><div class="big neg">${clp(mensual*12)}</div></div>
-    <div class="card"><h3>Suscripciones activas</h3><div class="big">${entries.length}</div></div></div>
-  <table><thead><tr><th>Servicio</th><th style="text-align:right">Valor/mes</th><th style="text-align:right">Al año</th><th style="text-align:right">Pagos registrados</th></tr></thead><tbody>
-  ${entries.map(([k,v])=>`<tr><td>${k}</td><td style="text-align:right">${clp(v.monto)}</td>
-    <td style="text-align:right" class="muted">${clp(v.monto*12)}</td><td style="text-align:right" class="muted">${v.n}</td></tr>`).join("")}
-  </tbody></table>
-  <div class="tip" style="margin-top:10px">💡 Pregunta clave: ¿cuáles usaste de verdad este mes? Cancelar una de ${clp(Math.round(mensual/entries.length))} promedio te ahorra ~${clp(Math.round(mensual/entries.length*12))} al año.</div>`;
+    <div class="card"><h3>Suscripciones activas</h3><div class="big">${activas.length}<span class="muted" style="font-size:16px">/${Object.keys(subs).length}</span></div></div>
+    ${ahorroInact?`<div class="card"><h3>Ahorro por canceladas</h3><div class="big pos">${clp(ahorroInact*12)}<span class="muted" style="font-size:14px">/año</span></div></div>`:""}</div>
+  <div class="flex" style="margin-bottom:10px"><label style="margin:0">Mostrar:</label>
+    <select onchange="setSubsFilter(this.value)" style="max-width:180px">
+      <option value="todas" ${subsFilterVal==="todas"?"selected":""}>Todas</option>
+      <option value="activas" ${subsFilterVal==="activas"?"selected":""}>Solo activas</option>
+      <option value="inactivas" ${subsFilterVal==="inactivas"?"selected":""}>Solo inactivas</option>
+    </select></div>
+  ${entries.length?`<table><thead><tr><th>Activa</th><th>Servicio</th><th style="text-align:right">Valor/mes</th><th style="text-align:right">Al año</th><th style="text-align:right">Pagos</th></tr></thead><tbody>
+  ${entries.map(([k,v])=>{const ina=!!off[k];return `<tr style="${ina?'opacity:.5':''}">
+    <td><label style="display:inline-flex;align-items:center;cursor:pointer;margin:0">
+      <input type="checkbox" ${ina?"":"checked"} onchange="toggleSub('${k.replace(/'/g,"\\'")}')" style="width:auto;accent-color:var(--accent);transform:scale(1.25);cursor:pointer"></label></td>
+    <td style="${ina?'text-decoration:line-through':''}">${v.nombre}</td>
+    <td style="text-align:right">${clp(v.monto)}</td>
+    <td style="text-align:right" class="muted">${clp(v.monto*12)}</td>
+    <td style="text-align:right" class="muted">${v.n}</td></tr>`;}).join("")}
+  </tbody></table>`:`<div class="empty">Nada que mostrar con este filtro.</div>`}
+  <div class="tip" style="margin-top:10px">💡 Desmarca las que canceles: salen del costo mensual y se acumulan como ahorro anual.</div>`;
 }
 
 /* ============ Gastos hormiga ============ */
