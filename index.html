@@ -630,18 +630,50 @@ function renderDashboard(){
   document.getElementById("dash-month").textContent=monthLabel(mk);
   document.getElementById("dash-cats").innerHTML=catBars(mk);
 
-  // tendencia últimos 6 meses
+  renderTrend();
+}
+
+/* Gráfico de barras: ingresos vs gastos por mes */
+function clpShort(n){
+  if(n>=1000000) return "$"+(n/1000000).toFixed(1).replace(".",",")+"M";
+  if(n>=1000) return "$"+Math.round(n/1000)+"k";
+  return clp(n);
+}
+function renderTrend(){
+  const el=document.getElementById("dash-trend"); if(!el) return;
   const months=monthsSpan().slice(0,6).reverse();
-  const maxV=Math.max(1,...months.map(m=>Math.max(sumByType("ingreso",m),sumByType("gasto",m))));
-  document.getElementById("dash-trend").innerHTML = months.length? months.map(m=>{
-    const ing=sumByType("ingreso",m), gas=sumByType("gasto",m);
-    return `<div class="bar-row"><div class="bar-label">${monthLabel(m)}</div>
-      <div class="bar-track" style="display:flex;flex-direction:column;gap:3px;height:auto;background:none">
-        <div class="bar-track"><div class="bar-fill" style="width:${ing/maxV*100}%;background:#15a24a"></div></div>
-        <div class="bar-track"><div class="bar-fill" style="width:${gas/maxV*100}%;background:#e02424"></div></div>
-      </div>
-      <div class="bar-val"><span class="pos">${clp(ing)}</span><br><span class="neg">${clp(gas)}</span></div></div>`;
-  }).join("") : `<div class="empty">Aún no hay movimientos.</div>`;
+  if(!months.length){ el.innerHTML=`<div class="empty">Aún no hay movimientos.</div>`; return; }
+  const serie=months.map(m=>({m,ing:sumByType("ingreso",m),gas:sumByType("gasto",m)}));
+  const maxV=Math.max(1,...serie.flatMap(d=>[d.ing,d.gas]));
+  const W=760,H=260,padT=26,padB=30,padL=10,padR=10;
+  const areaH=H-padT-padB;
+  const cw=(W-padL-padR)/serie.length;
+  const bw=Math.min(36,cw*0.30);
+  const y=v=>padT+areaH*(1-v/maxV);
+  // líneas guía horizontales (25/50/75/100%)
+  const grid=[0.25,0.5,0.75,1].map(f=>{
+    const gy=padT+areaH*(1-f);
+    return `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--border)" stroke-dasharray="4 5" stroke-width="1"/>
+      <text x="${padL+2}" y="${gy-4}" style="font-size:10px;fill:var(--muted)">${clpShort(maxV*f)}</text>`;
+  }).join("");
+  const bars=serie.map((d,i)=>{
+    const cx=padL+cw*i+cw/2;
+    const yI=y(d.ing), yG=y(d.gas);
+    const hI=Math.max(d.ing?3:0,H-padB-yI), hG=Math.max(d.gas?3:0,H-padB-yG);
+    return `
+      <rect x="${(cx-bw-3).toFixed(1)}" y="${yI.toFixed(1)}" width="${bw.toFixed(1)}" height="${hI.toFixed(1)}" rx="5" fill="var(--green)">
+        <title>${monthLabel(d.m)} · Ingresos: ${clp(d.ing)}</title></rect>
+      <rect x="${(cx+3).toFixed(1)}" y="${yG.toFixed(1)}" width="${bw.toFixed(1)}" height="${hG.toFixed(1)}" rx="5" fill="var(--red)">
+        <title>${monthLabel(d.m)} · Gastos: ${clp(d.gas)}</title></rect>
+      ${d.ing?`<text x="${(cx-3-bw/2).toFixed(1)}" y="${(yI-5).toFixed(1)}" text-anchor="middle" style="font-size:10px;font-weight:700;fill:var(--green)">${clpShort(d.ing)}</text>`:""}
+      ${d.gas?`<text x="${(cx+3+bw/2).toFixed(1)}" y="${(yG-5).toFixed(1)}" text-anchor="middle" style="font-size:10px;font-weight:700;fill:var(--red)">${clpShort(d.gas)}</text>`:""}
+      <text x="${cx.toFixed(1)}" y="${H-9}" text-anchor="middle" style="font-size:12px;fill:var(--muted)">${monthLabel(d.m)}</text>`;
+  }).join("");
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block">${grid}${bars}</svg>
+    <div class="flex small muted" style="gap:18px;justify-content:center;margin-top:6px">
+      <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--green);margin-right:6px"></span>Ingresos</span>
+      <span><span style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--red);margin-right:6px"></span>Gastos</span>
+    </div>`;
 }
 
 function renderCreditCards(){
