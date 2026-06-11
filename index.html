@@ -602,17 +602,30 @@ function portfolioValue(){
 }
 async function fetchPortfolio(){
   try{
-    const r=await fetch("https://diego94diaz-oss.github.io/portfolio-dashboard/",{cache:"no-store"});
-    const txt=await r.text();
-    const usd=parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-    const clpHold=parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-    let rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
+    // 1) Valor con precios en vivo: el portfolio-dashboard (mismo dominio) lo deja
+    //    calculado en localStorage cada vez que se abre. Es el más actualizado.
+    let usd=parseFloat(localStorage.getItem("combined_total_usd"))||null;
+    let clpHold=parseFloat(localStorage.getItem("combined_total_clp"))||null;
+    let rate=null, sync=!!(usd&&clpHold);
+    // 2) Si no está (otro navegador / versión local), leer los valores publicados
+    if(!usd||!clpHold){
+      const r=await fetch("https://diego94diaz-oss.github.io/portfolio-dashboard/",{cache:"no-store"});
+      const txt=await r.text();
+      usd=usd||parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+      clpHold=clpHold||parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+      rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
+    }
     try{
       const fx=await fetch("https://open.er-api.com/v6/latest/USD");
       const d=await fx.json(); if(d&&d.rates&&d.rates.CLP) rate=d.rates.CLP;
     }catch(e){}
-    if(usd&&clpHold){ PORTFOLIO_CLP=Math.round(clpHold+usd*rate); PORTFOLIO_LIVE=true; renderDashboard(); }
-  }catch(e){ /* sin conexión o file://: se usa el valor guardado */ }
+    if(usd&&clpHold&&rate){
+      PORTFOLIO_CLP=Math.round(clpHold+usd*rate);
+      PORTFOLIO_LIVE=sync;
+      if(data.meta){ data.meta.portfolioCLP=PORTFOLIO_CLP; save(); } // recordar último valor
+      renderDashboard();
+    }
+  }catch(e){ /* sin conexión: se usa el valor guardado */ }
 }
 
 function renderDashboard(){
@@ -628,7 +641,7 @@ function renderDashboard(){
     {h:"Balance del mes",v:clp(ahorro),c:ahorro>=0?"pos":"neg"},
     {h:"Deuda total",v:clp(totalDebt()),c:totalDebt()>0?"neg":"pos"},
     {h:"Inversiones (portafolio)",v:inv!==null?clp(inv):clp(inversionesTotal()),c:"pos",
-     s:inv!==null?(PORTFOLIO_LIVE?"USD+CLP · en línea":"USD+CLP · último valor conocido"):"aportes registrados"},
+     s:inv!==null?(PORTFOLIO_LIVE?"USD+CLP · precios del momento":"USD+CLP · último valor conocido"):"aportes registrados"},
     {h:"Patrimonio neto",v:clp(patrimonio),c:patrimonio>=0?"pos":"neg",s:"líquido + inversiones − deudas"},
   ];
   document.getElementById("dash-cards").innerHTML=cards.map(c=>
