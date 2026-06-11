@@ -723,7 +723,22 @@ function renderBudget(){
   const gastos={};
   data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk)
     .forEach(t=>gastos[t.category||"Otros"]=(gastos[t.category||"Otros"]||0)+t.amount);
-  el.innerHTML=CATS.map(cat=>{
+  // Resumen general del presupuesto
+  const totalObjetivo=CATS.reduce((s,c)=>s+(budgets[c]||0),0);
+  const totalGastadoPres=CATS.filter(c=>budgets[c]).reduce((s,c)=>s+(gastos[c]||0),0);
+  const totalGastadoMes=Object.values(gastos).reduce((s,v)=>s+v,0);
+  const pctGlobal=totalObjetivo?Math.min(100,totalGastadoPres/totalObjetivo*100):0;
+  const sobreGlobal=totalObjetivo&&totalGastadoPres>totalObjetivo;
+  const resumen=totalObjetivo?`<div class="grid cards" style="margin-bottom:14px">
+      <div class="card"><h3>Gastado total del mes</h3><div class="big neg">${clp(totalGastadoMes)}</div></div>
+      <div class="card"><h3>Gastado (categorías con tope)</h3><div class="big ${sobreGlobal?'neg':''}">${clp(totalGastadoPres)}</div></div>
+      <div class="card"><h3>Presupuesto objetivo</h3><div class="big">${clp(totalObjetivo)}</div></div>
+      <div class="card"><h3>${sobreGlobal?'Excedido en':'Disponible'}</h3><div class="big ${sobreGlobal?'neg':'pos'}">${clp(Math.abs(totalObjetivo-totalGastadoPres))}</div></div>
+    </div>
+    <div class="bar-track" style="height:16px;margin-bottom:4px"><div class="bar-fill" style="width:${pctGlobal}%;background:${sobreGlobal?'linear-gradient(90deg,#ff914d,#e0252b)':(pctGlobal>=80?'linear-gradient(90deg,#eab308,#ff914d)':'linear-gradient(90deg,#5934c5,#7b63f5)')}"></div></div>
+    <div class="flex small muted" style="justify-content:space-between;margin-bottom:14px"><span>Avance global del presupuesto</span><span>${Math.round(pctGlobal)}%</span></div>`
+  :"";
+  el.innerHTML=resumen+CATS.map(cat=>{
     const b=budgets[cat]||0, g=gastos[cat]||0;
     const pct=b?Math.min(100,g/b*100):0;
     const sobre=b&&g>b;
