@@ -918,25 +918,37 @@ function renderSubs(){
 }
 
 /* ============ Gastos hormiga ============ */
+let hormigaMes="";
+function setHormigaMes(v){ hormigaMes=v; renderHormiga(); }
 function renderHormiga(){
   const el=document.getElementById("an-hormiga"); if(!el) return;
   const LIMITE=10000;
+  const months=monthsSpan();
+  const selector=`<div class="flex" style="margin-bottom:10px"><label style="margin:0">Mes:</label>
+    <select onchange="setHormigaMes(this.value)" style="max-width:200px">
+      <option value="" ${hormigaMes===""?"selected":""}>Todo el período</option>
+      ${months.map(m=>`<option value="${m}" ${hormigaMes===m?"selected":""}>${monthLabel(m)}</option>`).join("")}
+    </select></div>`;
   const grupos={};
-  data.transactions.filter(t=>t.type==="gasto"&&t.amount<LIMITE&&t.category!=="Suscripciones").forEach(t=>{
+  data.transactions.filter(t=>t.type==="gasto"&&t.amount<LIMITE&&t.category!=="Suscripciones"
+      &&(!hormigaMes||monthKey(t.date)===hormigaMes)).forEach(t=>{
     const k=(t.desc||"(sin descripción)").toLowerCase().replace(/compra\s+/g,"").trim().slice(0,28);
     (grupos[k]=grupos[k]||{n:0,tot:0,nombre:t.desc||"(sin descripción)"}).n++;
     grupos[k].tot+=t.amount;
   });
-  const meses=Math.max(1,monthsSpan().length-0);
-  const rows=Object.values(grupos).filter(g=>g.n>=3).sort((a,b)=>b.tot-a.tot).slice(0,12);
-  if(!rows.length){ el.innerHTML=`<div class="empty">No detecto gastos hormiga recurrentes. 👌</div>`; return; }
+  const porMes=!!hormigaMes;
+  const meses=porMes?1:Math.max(1,months.length);
+  const minRep=porMes?2:3;
+  const rows=Object.values(grupos).filter(g=>g.n>=minRep).sort((a,b)=>b.tot-a.tot).slice(0,12);
+  if(!rows.length){ el.innerHTML=selector+`<div class="empty">No detecto gastos hormiga recurrentes${porMes?" en "+monthLabel(hormigaMes):""}. 👌</div>`; return; }
   const totHormiga=rows.reduce((s,g)=>s+g.tot,0);
-  el.innerHTML=`<div class="small muted" style="margin-bottom:8px">Compras menores a ${clp(LIMITE)} que se repiten 3+ veces. Individualmente parecen nada; al año son plata.</div>
-  <table><thead><tr><th>Gasto</th><th style="text-align:right">Veces</th><th style="text-align:right">Total acumulado</th><th style="text-align:right">~Promedio/mes</th></tr></thead><tbody>
+  el.innerHTML=selector+
+  `<div class="small muted" style="margin-bottom:8px">Compras menores a ${clp(LIMITE)} que se repiten ${minRep}+ veces${porMes?" en "+monthLabel(hormigaMes):""}. Individualmente parecen nada; al año son plata.</div>
+  <table><thead><tr><th>Gasto</th><th style="text-align:right">Veces</th><th style="text-align:right">${porMes?"Total del mes":"Total acumulado"}</th>${porMes?"":'<th style="text-align:right">~Promedio/mes</th>'}</tr></thead><tbody>
   ${rows.map(g=>`<tr><td>${g.nombre.slice(0,38)}</td><td style="text-align:right">${g.n}</td>
-    <td style="text-align:right" class="neg">${clp(g.tot)}</td><td style="text-align:right" class="muted">${clp(Math.round(g.tot/meses))}</td></tr>`).join("")}
+    <td style="text-align:right" class="neg">${clp(g.tot)}</td>${porMes?"":`<td style="text-align:right" class="muted">${clp(Math.round(g.tot/meses))}</td>`}</tr>`).join("")}
   </tbody></table>
-  <div class="tip" style="margin-top:10px">🐜 Estos ${rows.length} gastos suman <b>${clp(totHormiga)}</b> en el período (~${clp(Math.round(totHormiga/meses))}/mes). Recortar la mitad libera ~${clp(Math.round(totHormiga/meses/2))} mensuales para tus deudas.</div>`;
+  <div class="tip" style="margin-top:10px">🐜 Estos ${rows.length} gastos suman <b>${clp(totHormiga)}</b> ${porMes?"en "+monthLabel(hormigaMes):`en el período (~${clp(Math.round(totHormiga/meses))}/mes)`}. Recortar la mitad libera ~${clp(Math.round(totHormiga/meses/2))} mensuales para tus deudas.</div>`;
 }
 
 function fillMonthFilter(){
