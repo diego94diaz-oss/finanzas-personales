@@ -318,6 +318,7 @@
 <script>
 /* ============ Almacenamiento ============ */
 const KEY = "finanzas_personales_v1";
+const PREFS_KEY = "fin_prefs";
 const CATS = ["Vivienda","Alimentación","Transporte","Servicios básicos","Deudas y cuotas","Salud","Cuidado personal","Entretenimiento","Suscripciones","Compras","Educación","Inversiones","Otros"];
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -357,11 +358,32 @@ function load(){
       localStorage.setItem("finanzas_seed_version", window.FINANZAS_SEED_VERSION);
       return seed;
     }
-    const raw=localStorage.getItem(KEY); if(raw) return JSON.parse(raw);
+    const raw=localStorage.getItem(KEY); if(raw){ const d=JSON.parse(raw); applyPrefs(d); return d; }
   }catch(e){}
-  const d=defaultData(); localStorage.setItem(KEY,JSON.stringify(d)); return d;
+  const d=defaultData(); applyPrefs(d); localStorage.setItem(KEY,JSON.stringify(d)); return d;
 }
-function save(){ if(window.saveEnc) window.saveEnc(); }
+function save(){ localStorage.setItem(KEY,JSON.stringify(data)); savePrefs(); }
+function savePrefs(){
+  try{
+    const p={};
+    if(data.meta){
+      if(data.meta.budgets&&Object.keys(data.meta.budgets).length) p.budgets=data.meta.budgets;
+      if(data.meta.emergencyGoal) p.emergencyGoal=data.meta.emergencyGoal;
+      if(data.meta.subsOff&&Object.keys(data.meta.subsOff).length) p.subsOff=data.meta.subsOff;
+    }
+    localStorage.setItem(PREFS_KEY,JSON.stringify(p));
+  }catch(e){}
+}
+function applyPrefs(d){
+  try{
+    const p=JSON.parse(localStorage.getItem(PREFS_KEY)||"null");
+    if(!p) return;
+    d.meta=d.meta||{};
+    if(p.budgets) d.meta.budgets=Object.assign({},d.meta.budgets||{},p.budgets);
+    if(p.emergencyGoal) d.meta.emergencyGoal=p.emergencyGoal;
+    if(p.subsOff) d.meta.subsOff=Object.assign({},d.meta.subsOff||{},p.subsOff);
+  }catch(e){}
+}
 
 /* ============ Utilidades ============ */
 function clp(n){ n=Math.round(n||0); return (n<0?"-$":"$")+Math.abs(n).toLocaleString("es-CL"); }
@@ -1430,6 +1452,8 @@ fetchPortfolio();
       if(!obj) obj=await dec(key,b64d(E.iv),b64d(E.ct));
       SK=key;
       data=obj; if(!data.debts)data.debts=[]; if(!data.meta)data.meta={};
+      // aplicar preferencias guardadas localmente (presupuestos, metas, suscripciones)
+      try{var fp=JSON.parse(localStorage.getItem("fin_prefs")||"null");if(fp){if(fp.budgets)data.meta.budgets=Object.assign({},data.meta.budgets||{},fp.budgets);if(fp.emergencyGoal)data.meta.emergencyGoal=fp.emergencyGoal;if(fp.subsOff)data.meta.subsOff=Object.assign({},data.meta.subsOff||{},fp.subsOff);}}catch(e2){}
       renderAll();
       document.getElementById("lock").style.display="none";
       window.saveEnc();
