@@ -1,0 +1,21 @@
+# Datos privados y respaldos
+*.local.js
+*.private.js
+*.backup.json
+respaldo*.json
+backups/
+exports/
+
+# Credenciales / secretos
+.env
+.env.*
+secrets/
+*.key
+*.pem
+
+# Sistema
+.DS_Store
+Thumbs.db
+# Python
+__pycache__/
+*.pyc

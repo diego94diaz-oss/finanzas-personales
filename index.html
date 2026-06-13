@@ -1427,31 +1427,57 @@ fetchPortfolio();
     ev.preventDefault();
     var err=document.getElementById("lockerr"); err.textContent="Descifrando…";
     try{
-      var E=window.FINANZAS_ENC; BASESIG=E.ct.slice(0,40);
-      var key=await deriveKey(document.getElementById("lockp").value,b64d(E.salt),E.iter||200000);
-      var obj=null, localRaw=localStorage.getItem("fin_local");
-      if(localRaw){
-        try{
-          var L=JSON.parse(localRaw);
-          var localObj=await dec(key,b64d(L.iv),b64d(L.ct));
-          if(L.baseSig===BASESIG){
-            obj=localObj;            // mismos datos publicados: manda lo guardado en este dispositivo
-          }else{
-            // hay datos publicados nuevos: mandan ellos, pero conservamos tus preferencias locales
-            var bundled=await dec(key,b64d(E.iv),b64d(E.ct));
-            bundled.meta=bundled.meta||{};
-            if(localObj.meta){
-              if(localObj.meta.budgets) bundled.meta.budgets=localObj.meta.budgets;
-              if(localObj.meta.emergencyGoal) bundled.meta.emergencyGoal=localObj.meta.emergencyGoal;
-              if(localObj.meta.subsOff) bundled.meta.subsOff=localObj.meta.subsOff;
+      var E=window.FINANZAS_ENC;
+      var pass=document.getElementById("lockp").value;
+      var key=null, obj=null, localRaw=localStorage.getItem("fin_local");
+
+      if(E && E.ct && E.iv && E.salt){
+        BASESIG=E.ct.slice(0,40);
+        key=await deriveKey(pass,b64d(E.salt),E.iter||200000);
+        if(localRaw){
+          try{
+            var L=JSON.parse(localRaw);
+            var localObj=await dec(key,b64d(L.iv),b64d(L.ct));
+            if(L.baseSig===BASESIG){
+              obj=localObj;            // mismos datos publicados: manda lo guardado en este dispositivo
+            }else{
+              // hay datos publicados nuevos: mandan ellos, pero conservamos tus preferencias locales
+              var bundled=await dec(key,b64d(E.iv),b64d(E.ct));
+              bundled.meta=bundled.meta||{};
+              if(localObj.meta){
+                if(localObj.meta.budgets) bundled.meta.budgets=localObj.meta.budgets;
+                if(localObj.meta.emergencyGoal) bundled.meta.emergencyGoal=localObj.meta.emergencyGoal;
+                if(localObj.meta.subsOff) bundled.meta.subsOff=localObj.meta.subsOff;
+              }
+              obj=bundled;
             }
-            obj=bundled;
+          }catch(e2){ /* blob local ilegible: se ignora y se usa el publicado */ }
+        }
+        if(!obj) obj=await dec(key,b64d(E.iv),b64d(E.ct));
+      }else{
+        // Modo público seguro: el repositorio no incluye datos financieros cifrados.
+        // La app sigue funcionando con datos locales cifrados en este navegador.
+        var saltStr=localStorage.getItem("fin_local_salt");
+        if(!saltStr){
+          var newSalt=crypto.getRandomValues(new Uint8Array(16));
+          saltStr=b64e(newSalt);
+          localStorage.setItem("fin_local_salt",saltStr);
+        }
+        BASESIG="local-only-v1";
+        key=await deriveKey(pass,b64d(saltStr),200000);
+        if(localRaw){
+          try{
+            var L2=JSON.parse(localRaw);
+            obj=await dec(key,b64d(L2.iv),b64d(L2.ct));
+          }catch(e3){
+            obj=null;
           }
-        }catch(e2){ /* blob local ilegible: se ignora y se usa el publicado */ }
+        }
+        if(!obj) obj=defaultData();
       }
-      if(!obj) obj=await dec(key,b64d(E.iv),b64d(E.ct));
       SK=key;
       data=obj; if(!data.debts)data.debts=[]; if(!data.meta)data.meta={};
+
       // aplicar preferencias guardadas localmente (presupuestos, metas, suscripciones)
       try{var fp=JSON.parse(localStorage.getItem("fin_prefs")||"null");if(fp){if(fp.budgets)data.meta.budgets=Object.assign({},data.meta.budgets||{},fp.budgets);if(fp.emergencyGoal)data.meta.emergencyGoal=fp.emergencyGoal;if(fp.subsOff)data.meta.subsOff=Object.assign({},data.meta.subsOff||{},fp.subsOff);}}catch(e2){}
       renderAll();
