@@ -31,3 +31,13 @@ python -m http.server 8000
 ```
 
 Luego abrir `http://localhost:8000`.
+
+## Calidad automatizada
+
+Este repositorio incluye un quality gate local/CI:
+
+```bash
+python scripts/quality_check.py
+```
+
+Valida sintaxis de JavaScript inline, compilación Python si se agregan scripts, y escaneo básico de secretos/archivos privados.
