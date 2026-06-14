@@ -240,6 +240,7 @@
           <option value="transferencia">Transferencias</option>
         </select>
         <select id="filter-month" onchange="renderTransactions()" style="max-width:180px"></select>
+        <select id="filter-account" onchange="renderTransactions()" style="max-width:200px"></select>
         <select id="filter-category" onchange="renderTransactions()" style="max-width:200px"></select>
         <input id="filter-text" oninput="renderTransactions()" placeholder="🔍 Buscar… (ej: Copec, Berta)" style="max-width:230px">
       </div>
@@ -989,16 +990,28 @@ function fillCategoryFilter(){
   sel.value=cats.includes(cur)?cur:"";
 }
 
+function fillAccountFilter(){
+  const sel=document.getElementById("filter-account");
+  const cur=sel.value;
+  const ids=[...new Set(data.transactions.flatMap(t=>[t.account,t.to]).filter(Boolean))];
+  const accs=ids.map(id=>({id,name:accName(id)})).filter(a=>a.name).sort((a,b)=>a.name.localeCompare(b.name));
+  sel.innerHTML=`<option value="">Todas las cuentas</option>`+accs.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
+  sel.value=ids.includes(cur)?cur:"";
+}
+
 function renderTransactions(){
   fillMonthFilter();
   fillCategoryFilter();
+  fillAccountFilter();
   const ft=document.getElementById("filter-type").value;
   const fm=document.getElementById("filter-month").value;
+  const fa=document.getElementById("filter-account").value;
   const fc=document.getElementById("filter-category").value;
   const fx=(document.getElementById("filter-text").value||"").trim().toLowerCase();
   let list=[...data.transactions].sort((a,b)=>(b.date||"").localeCompare(a.date||""));
   if(ft) list=list.filter(t=>t.type===ft);
   if(fm) list=list.filter(t=>monthKey(t.date)===fm);
+  if(fa) list=list.filter(t=>t.account===fa||t.to===fa);
   if(fc) list=list.filter(t=>t.category===fc);
   if(fx) list=list.filter(t=>((t.desc||"")+" "+accName(t.account)).toLowerCase().includes(fx));
   if(!list.length){ document.getElementById("mv-list").innerHTML=`<div class="empty">Sin movimientos para este filtro.</div>`; return; }
