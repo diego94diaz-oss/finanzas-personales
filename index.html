@@ -1417,7 +1417,7 @@ fetchPortfolio();
   // Sync de preferencias entre dispositivos (getpantry.cloud). El contenido viaja
   // CIFRADO con tu contraseña; sin ella nadie puede leerlo. El ID solo identifica
   // el "cajón" donde se guardan tus presupuestos/suscripciones.
-  var PANTRY="__PANTRY_ID__";
+  var PANTRY="cd69ecbd-6f76-4a07-8d9e-663c92c7a32b";
   var SYNC_URL="https://getpantry.cloud/apiv1/pantry/"+PANTRY+"/basket/finanzas_prefs";
   function syncOn(){ return PANTRY && PANTRY.indexOf("__")!==0 && !!SYNCPASS; }
   function b64d(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});}
@@ -1476,7 +1476,8 @@ fetchPortfolio();
       var key=await deriveKey(SYNCPASS,salt,200000);
       var ct=await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,new TextEncoder().encode(JSON.stringify(prefs)));
       var body=JSON.stringify({v:1,iter:200000,salt:b64e(salt),iv:b64e(iv),ct:b64e(ct),updatedAt:Date.now()});
-      await fetch(SYNC_URL,{method:"PUT",headers:{"Content-Type":"application/json"},body:body});
+      var r=await fetch(SYNC_URL,{method:"PUT",headers:{"Content-Type":"application/json"},body:body});
+      if(!r.ok){ await fetch(SYNC_URL,{method:"POST",headers:{"Content-Type":"application/json"},body:body}); } // recrea el cajón si expiró
     }catch(e){}
   }
   function syncPush(){ if(pushT) clearTimeout(pushT); pushT=setTimeout(syncPushNow,1200); }
