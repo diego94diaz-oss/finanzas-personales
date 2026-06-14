@@ -1413,7 +1413,13 @@ fetchPortfolio();
 </script>
 <script>
 (function(){
-  var SK=null, BASESIG=null;
+  var SK=null, BASESIG=null, SYNCPASS=null, pushT=null;
+  // Sync de preferencias entre dispositivos (getpantry.cloud). El contenido viaja
+  // CIFRADO con tu contraseña; sin ella nadie puede leerlo. El ID solo identifica
+  // el "cajón" donde se guardan tus presupuestos/suscripciones.
+  var PANTRY="__PANTRY_ID__";
+  var SYNC_URL="https://getpantry.cloud/apiv1/pantry/"+PANTRY+"/basket/finanzas_prefs";
+  function syncOn(){ return PANTRY && PANTRY.indexOf("__")!==0 && !!SYNCPASS; }
   function b64d(s){return Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});}
   function b64e(buf){var u=new Uint8Array(buf),b="";for(var i=0;i<u.length;i++)b+=String.fromCharCode(u[i]);return btoa(b);}
   async function deriveKey(pass,salt,iter){
@@ -1426,14 +1432,64 @@ fetchPortfolio();
     var pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:iv},key,ct);
     return JSON.parse(new TextDecoder().decode(pt));
   }
-  // Guardado local SIEMPRE cifrado (mismos datos, misma contraseña; nada en claro)
-  window.saveEnc=async function(){
+  function collectPrefs(){
+    var p={};
+    if(data&&data.meta){
+      if(data.meta.budgets&&Object.keys(data.meta.budgets).length) p.budgets=data.meta.budgets;
+      if(data.meta.emergencyGoal) p.emergencyGoal=data.meta.emergencyGoal;
+      if(data.meta.subsOff&&Object.keys(data.meta.subsOff).length) p.subsOff=data.meta.subsOff;
+    }
+    return p;
+  }
+  function applyPrefsObj(p){
+    if(!p) return false;
+    data.meta=data.meta||{}; var changed=false;
+    if(p.budgets){ data.meta.budgets=Object.assign({},data.meta.budgets||{},p.budgets); changed=true; }
+    if(p.emergencyGoal){ data.meta.emergencyGoal=p.emergencyGoal; changed=true; }
+    if(p.subsOff){ data.meta.subsOff=Object.assign({},data.meta.subsOff||{},p.subsOff); changed=true; }
+    return changed;
+  }
+  // Trae las preferencias guardadas en la nube y las aplica en este dispositivo
+  async function syncPull(){
+    if(!syncOn()) return;
+    try{
+      var r=await fetch(SYNC_URL,{method:"GET",headers:{"Content-Type":"application/json"}});
+      if(!r.ok) return;
+      var blob=await r.json();
+      if(!blob||!blob.salt||!blob.ct) return;
+      var key=await deriveKey(SYNCPASS,b64d(blob.salt),blob.iter||200000);
+      var prefs=await dec(key,b64d(blob.iv),b64d(blob.ct));
+      if(applyPrefsObj(prefs)){
+        try{ localStorage.setItem("fin_prefs",JSON.stringify(collectPrefs())); }catch(e){}
+        renderAll();
+        window.saveEnc(true);   // guardar local, sin volver a subir
+      }
+    }catch(e){}
+  }
+  // Sube las preferencias de este dispositivo a la nube (cifradas)
+  async function syncPushNow(){
+    if(!syncOn()) return;
+    try{
+      var prefs=collectPrefs();
+      var salt=crypto.getRandomValues(new Uint8Array(16));
+      var iv=crypto.getRandomValues(new Uint8Array(12));
+      var key=await deriveKey(SYNCPASS,salt,200000);
+      var ct=await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},key,new TextEncoder().encode(JSON.stringify(prefs)));
+      var body=JSON.stringify({v:1,iter:200000,salt:b64e(salt),iv:b64e(iv),ct:b64e(ct),updatedAt:Date.now()});
+      await fetch(SYNC_URL,{method:"PUT",headers:{"Content-Type":"application/json"},body:body});
+    }catch(e){}
+  }
+  function syncPush(){ if(pushT) clearTimeout(pushT); pushT=setTimeout(syncPushNow,1200); }
+  // Guardado local SIEMPRE cifrado (nada en claro). Si noPush!=true, además sube a la nube.
+  window.saveEnc=async function(noPush){
     if(!SK) return;
     try{
       var iv=crypto.getRandomValues(new Uint8Array(12));
       var ct=await crypto.subtle.encrypt({name:"AES-GCM",iv:iv},SK,new TextEncoder().encode(JSON.stringify(data)));
       localStorage.setItem("fin_local",JSON.stringify({baseSig:BASESIG,iv:b64e(iv),ct:b64e(ct),savedAt:Date.now()}));
+      try{ localStorage.setItem("fin_prefs",JSON.stringify(collectPrefs())); }catch(e){}
     }catch(e){}
+    if(noPush!==true) syncPush();
   };
   var f=document.getElementById("lockf");
   f.addEventListener("submit",async function(ev){
@@ -1441,7 +1497,8 @@ fetchPortfolio();
     var err=document.getElementById("lockerr"); err.textContent="Descifrando…";
     try{
       var E=window.FINANZAS_ENC; BASESIG=E.ct.slice(0,40);
-      var key=await deriveKey(document.getElementById("lockp").value,b64d(E.salt),E.iter||200000);
+      var pass=document.getElementById("lockp").value;
+      var key=await deriveKey(pass,b64d(E.salt),E.iter||200000);
       var obj=null, localRaw=localStorage.getItem("fin_local");
       if(localRaw){
         try{
@@ -1463,13 +1520,14 @@ fetchPortfolio();
         }catch(e2){ /* blob local ilegible: se ignora y se usa el publicado */ }
       }
       if(!obj) obj=await dec(key,b64d(E.iv),b64d(E.ct));
-      SK=key;
+      SK=key; SYNCPASS=pass;
       data=obj; if(!data.debts)data.debts=[]; if(!data.meta)data.meta={};
       // aplicar preferencias guardadas localmente (presupuestos, metas, suscripciones)
-      try{var fp=JSON.parse(localStorage.getItem("fin_prefs")||"null");if(fp){if(fp.budgets)data.meta.budgets=Object.assign({},data.meta.budgets||{},fp.budgets);if(fp.emergencyGoal)data.meta.emergencyGoal=fp.emergencyGoal;if(fp.subsOff)data.meta.subsOff=Object.assign({},data.meta.subsOff||{},fp.subsOff);}}catch(e2){}
+      try{var fp=JSON.parse(localStorage.getItem("fin_prefs")||"null"); applyPrefsObj(fp);}catch(e3){}
       renderAll();
       document.getElementById("lock").style.display="none";
-      window.saveEnc();
+      window.saveEnc(true);   // guardar local sin subir todavía
+      syncPull();             // traer preferencias de la nube y aplicarlas
     }catch(e){ err.textContent="Contraseña incorrecta"; }
   });
   document.getElementById("lockp").focus();
