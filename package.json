@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "scripts": {
+    "smoke": "python scripts/static_smoke.py",
+    "privacy": "python scripts/privacy_check.py",
+    "test": "npm run smoke && npm run privacy"
+  }
+}
