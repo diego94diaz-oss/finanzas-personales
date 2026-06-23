@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mis Finanzas Personales</title>
 <script src="datos_cifrados.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -125,17 +126,29 @@
   <form id="lockf" style="background:#fff;border:1px solid #ece5dd;border-radius:32px;padding:36px;width:344px;text-align:center;box-shadow:0 16px 50px rgba(46,42,66,.10)">
     <div style="width:56px;height:56px;margin:0 auto 16px;border-radius:50%;background:linear-gradient(135deg,#5934c5,#7b63f5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:27px;box-shadow:0 8px 20px rgba(89,52,197,.30)">$</div>
     <h2 style="color:#2e2a42;margin:0 0 4px;font-size:22px;font-weight:700;font-family:'Fraunces',Georgia,serif">Mis Finanzas</h2>
-    <p style="color:#807a93;font-size:13px;margin:0 0 20px">Ingresa tu contraseña para ver el dashboard</p>
-    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña" style="width:100%;padding:13px;border-radius:14px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:15px;box-sizing:border-box">
+    <p style="color:#807a93;font-size:13px;margin:0 0 14px">Puedes entrar con Supabase o con la contraseña local antigua.</p>
+    <div style="text-align:left;margin:8px 0 10px">
+      <label style="display:block;color:#807a93;font-size:12px;font-weight:700;margin:0 0 4px">Supabase URL</label>
+      <input id="sb-url-lock" type="url" autocomplete="off" placeholder="https://xxxx.supabase.co" style="width:100%;padding:10px;border-radius:12px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:13px;box-sizing:border-box;margin-bottom:7px">
+      <label style="display:block;color:#807a93;font-size:12px;font-weight:700;margin:0 0 4px">Supabase anon key</label>
+      <input id="sb-key-lock" type="password" autocomplete="off" placeholder="eyJ... (anon public key)" style="width:100%;padding:10px;border-radius:12px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:13px;box-sizing:border-box;margin-bottom:7px">
+      <label style="display:block;color:#807a93;font-size:12px;font-weight:700;margin:0 0 4px">Email</label>
+      <input id="sb-email-lock" type="email" autocomplete="username" placeholder="tu@email.com" style="width:100%;padding:10px;border-radius:12px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:13px;box-sizing:border-box;margin-bottom:7px">
+      <label style="display:block;color:#807a93;font-size:12px;font-weight:700;margin:0 0 4px">Password Supabase</label>
+      <input id="sb-pass-lock" type="password" autocomplete="current-password" placeholder="Contraseña Supabase" style="width:100%;padding:10px;border-radius:12px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:13px;box-sizing:border-box">
+    </div>
+    <button type="button" onclick="supabaseLoginFromLock()" style="width:100%;padding:13px;border:none;border-radius:999px;background:#008a56;color:#fff;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(0,138,86,.20)">Entrar con Supabase</button>
+    <div style="color:#807a93;font-size:12px;margin:13px 0 8px">o modo local antiguo</div>
+    <input id="lockp" type="password" autocomplete="current-password" placeholder="Contraseña local cifrada" style="width:100%;padding:13px;border-radius:14px;border:1px solid #ece5dd;background:#fff;color:#2e2a42;font-size:15px;box-sizing:border-box">
     <div id="lockerr" style="color:#e0252b;font-size:13px;min-height:18px;margin:9px 0"></div>
-    <button type="submit" style="width:100%;padding:13px;border:none;border-radius:999px;background:#5934c5;color:#fff;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(89,52,197,.28)">Entrar</button>
+    <button type="submit" style="width:100%;padding:13px;border:none;border-radius:999px;background:#5934c5;color:#fff;font-weight:700;font-size:15px;cursor:pointer;box-shadow:0 6px 16px rgba(89,52,197,.28)">Entrar local</button>
   </form>
 </div>
 <header>
   <div class="logo" aria-hidden="true">$</div>
   <div>
     <h1>Mis Finanzas</h1>
-    <p>Tu asesor financiero personal · datos privados en tu equipo.</p>
+    <p>Tu asesor financiero personal · local o Supabase con RLS.</p>
   </div>
   <div class="spacer"></div>
   <button id="theme-toggle" class="btn ghost" style="padding:9px 14px" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
@@ -149,6 +162,7 @@
   <button data-tab="plan">Plan de pago</button>
   <button data-tab="analisis">Análisis</button>
   <button data-tab="respaldo">Respaldo</button>
+  <button data-tab="nube">Nube</button>
 </nav>
 
 <main>
@@ -313,13 +327,51 @@
       <p class="small muted" id="storage-info" style="margin-top:14px"></p>
     </div>
   </section>
+
+  <!-- NUBE / SUPABASE -->
+  <section id="nube" class="section">
+    <div class="panel">
+      <h2>☁️ Supabase</h2>
+      <p class="small muted">Sincroniza tus cuentas, movimientos, deudas y preferencias en Supabase usando las tablas <code>fin_accounts</code>, <code>fin_transactions</code>, <code>fin_debts</code> y <code>fin_prefs</code>. La anon key es pública; nunca pegues service_role.</p>
+      <div class="row">
+        <div><label>Supabase URL</label><input id="sb-url" type="url" placeholder="https://xxxx.supabase.co"></div>
+        <div><label>Anon key pública</label><input id="sb-key" type="password" placeholder="eyJ... anon key"></div>
+        <div><label>Email</label><input id="sb-email" type="email" placeholder="tu@email.com"></div>
+        <div><label>Password</label><input id="sb-pass" type="password" placeholder="Contraseña Supabase"></div>
+      </div>
+      <div class="flex" style="margin-top:12px">
+        <button class="btn" onclick="supabaseSaveConfig()">Guardar config</button>
+        <button class="btn" onclick="supabaseSignUp()">Crear usuario</button>
+        <button class="btn" onclick="supabaseSignIn()">Entrar</button>
+        <button class="btn ghost" onclick="supabaseSignOut()">Salir</button>
+      </div>
+      <p id="sb-status" class="small muted" style="margin-top:12px">Supabase no iniciado.</p>
+    </div>
+    <div class="panel">
+      <h2>Migración y sincronización</h2>
+          <p class="small muted">Primero entra con la contraseña local antigua si quieres migrar lo que ya está cifrado en este navegador. “Migrar local → Supabase” sube/actualiza datos, pero no borra registros remotos automáticamente.</p>
+      <div class="tip">⚠️ Supabase guarda tus datos financieros como JSON en claro protegido por Auth/RLS. Es más cómodo y sincronizable, pero no es cifrado extremo a extremo: no uses service_role en el navegador.</div>
+      <div class="flex">
+        <button class="btn" onclick="supabasePushAll()">Migrar local → Supabase</button>
+        <button class="btn ghost" onclick="supabasePullAll()">Cargar Supabase → app</button>
+        <button class="btn ghost" onclick="supabaseSaveNow()">Guardar ahora</button>
+      </div>
+      <div id="sb-counts" class="small muted" style="margin-top:12px"></div>
+    </div>
+  </section>
 </main>
 
 <script>
 /* ============ Almacenamiento ============ */
 const KEY = "finanzas_personales_v1";
 const PREFS_KEY = "fin_prefs";
+const SUPABASE_CFG_KEY = "fin_supabase_cfg_v1";
 const CATS = ["Vivienda","Alimentación","Transporte","Servicios básicos","Deudas y cuotas","Salud","Cuidado personal","Entretenimiento","Suscripciones","Compras","Educación","Inversiones","Otros"];
+let sbClient = null;
+let sbUser = null;
+let sbSaveTimer = null;
+let sbReady = false;
+let sbCloudOnly = false;
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -362,8 +414,13 @@ function load(){
   }catch(e){}
   const d=defaultData(); applyPrefs(d); localStorage.setItem(KEY,JSON.stringify(d)); return d;
 }
-function save(){ localStorage.setItem(KEY,JSON.stringify(data)); savePrefs(); }
+function save(){
+  if(!sbCloudOnly) localStorage.setItem(KEY,JSON.stringify(data));
+  savePrefs();
+  if(sbReady) supabaseQueueSave();
+}
 function savePrefs(){
+  if(sbCloudOnly){ try{ localStorage.removeItem(PREFS_KEY); }catch(e){} return; }
   try{
     const p={};
     if(data.meta){
@@ -383,6 +440,175 @@ function applyPrefs(d){
     if(p.emergencyGoal) d.meta.emergencyGoal=p.emergencyGoal;
     if(p.subsOff) d.meta.subsOff=Object.assign({},d.meta.subsOff||{},p.subsOff);
   }catch(e){}
+}
+
+/* ============ Supabase ============ */
+function getSupabaseConfig(){
+  try{return JSON.parse(localStorage.getItem(SUPABASE_CFG_KEY)||"null")||{};}catch(e){return {};}
+}
+function setSupabaseStatus(msg, cls){
+  const el=document.getElementById("sb-status");
+  if(el){ el.className="small "+(cls||"muted"); el.textContent=msg; }
+  const lockErr=document.getElementById("lockerr");
+  if(lockErr && document.getElementById("lock").style.display!=="none") lockErr.textContent=msg;
+}
+function supabaseFillForms(){
+  const c=getSupabaseConfig();
+  [["sb-url",c.url],["sb-key",c.anonKey],["sb-email",c.email],["sb-url-lock",c.url],["sb-key-lock",c.anonKey],["sb-email-lock",c.email]].forEach(([id,val])=>{
+    const el=document.getElementById(id); if(el && val) el.value=val;
+  });
+}
+function jwtPayload(key){
+  try{
+    const part=((key||"").split(".")[1]||"").replace(/-/g,"+").replace(/_/g,"/");
+    const padded=part + "=".repeat((4 - part.length % 4) % 4);
+    return JSON.parse(atob(padded));
+  }catch(e){ return null; }
+}
+function isValidAnonKey(key){
+  const payload=jwtPayload(key);
+  return !!(payload && String(payload.role||"").toLowerCase()==="anon");
+}
+function supabaseSaveConfig(fromLock){
+  const url=(document.getElementById(fromLock?"sb-url-lock":"sb-url")?.value||document.getElementById("sb-url")?.value||"").trim();
+  const anonKey=(document.getElementById(fromLock?"sb-key-lock":"sb-key")?.value||document.getElementById("sb-key")?.value||"").trim();
+  const email=(document.getElementById(fromLock?"sb-email-lock":"sb-email")?.value||document.getElementById("sb-email")?.value||"").trim();
+  if(!url||!anonKey){ setSupabaseStatus("Falta URL o anon key de Supabase.","neg"); return false; }
+  if(!isValidAnonKey(anonKey)){ setSupabaseStatus("La key no parece ser anon. No pegues service_role; usa solo anon public key.","neg"); return false; }
+  localStorage.setItem(SUPABASE_CFG_KEY,JSON.stringify({url,anonKey,email}));
+  if(window.supabase){ sbClient=window.supabase.createClient(url,anonKey); }
+  supabaseFillForms(); setSupabaseStatus("Config Supabase guardada.","pos"); return true;
+}
+
+function supabaseInit(){
+  const c=getSupabaseConfig();
+  if(!c.url||!c.anonKey||!window.supabase) return false;
+  sbClient=window.supabase.createClient(c.url,c.anonKey);
+  return true;
+}
+async function supabaseRequire(){
+  if(!sbClient && !supabaseInit()) throw new Error("Configura Supabase URL y anon key primero.");
+  const {data:sessionData,error}=await sbClient.auth.getSession();
+  if(error) throw error;
+  sbUser=sessionData && sessionData.session && sessionData.session.user;
+  if(!sbUser) throw new Error("Debes iniciar sesión Supabase.");
+  sbReady=true; return sbUser;
+}
+async function supabaseSignUp(){
+  try{
+    if(!supabaseSaveConfig(false)) return;
+    const email=document.getElementById("sb-email").value.trim();
+    const password=document.getElementById("sb-pass").value;
+    if(!email||!password) throw new Error("Falta email o password.");
+    const {data:res,error}=await sbClient.auth.signUp({email,password});
+    if(error) throw error;
+    sbUser=res.user; setSupabaseStatus("Usuario creado. Si Supabase pide confirmar email, revísalo antes de entrar.","pos");
+  }catch(e){ setSupabaseStatus("Supabase signup: "+e.message,"neg"); }
+}
+async function supabaseSignIn(){
+  try{
+    if(!supabaseSaveConfig(false)) return;
+    const email=document.getElementById("sb-email").value.trim();
+    const password=document.getElementById("sb-pass").value;
+    if(!email||!password) throw new Error("Falta email o password.");
+    const {data:res,error}=await sbClient.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    sbUser=res.user; sbReady=true; sbCloudOnly=false; setSupabaseStatus("Conectado a Supabase como "+email+". Elige si quieres migrar local→Supabase o cargar Supabase→app.","pos");
+    renderSupabaseCounts();
+  }catch(e){ setSupabaseStatus("Supabase login: "+e.message,"neg"); }
+}
+async function supabaseLoginFromLock(){
+  try{
+    if(!supabaseSaveConfig(true)) return;
+    const email=document.getElementById("sb-email-lock").value.trim();
+    const password=document.getElementById("sb-pass-lock").value;
+    if(!email||!password) throw new Error("Falta email o password Supabase.");
+    const {data:res,error}=await sbClient.auth.signInWithPassword({email,password});
+    if(error) throw error;
+    sbUser=res.user; sbReady=true; sbCloudOnly=true;
+    await supabasePullAll({allowEmpty:true, cloudOnly:true});
+    document.getElementById("lock").style.display="none";
+    setSupabaseStatus("Conectado a Supabase como "+email,"pos");
+  }catch(e){ setSupabaseStatus("Supabase login: "+e.message,"neg"); }
+}
+async function supabaseSignOut(){
+  try{ if(sbClient) await sbClient.auth.signOut(); }catch(e){}
+  sbUser=null; sbReady=false; sbCloudOnly=false; setSupabaseStatus("Sesión Supabase cerrada.","muted");
+}
+function supabaseRows(kind){
+  if(kind==="accounts") return (data.accounts||[]).map(x=>({user_id:sbUser.id,id:x.id,data:x}));
+  if(kind==="transactions") return (data.transactions||[]).map(x=>({user_id:sbUser.id,id:x.id,data:x}));
+  if(kind==="debts") return (data.debts||[]).map(x=>({user_id:sbUser.id,id:x.id,data:x}));
+  return [];
+}
+async function supabaseUpsertTable(table, rows){
+  if(!rows.length) return;
+  const now=new Date().toISOString();
+  const {error}=await sbClient.from(table).upsert(rows.map(r=>Object.assign({updated_at:now},r)),{onConflict:"user_id,id"});
+  if(error) throw error;
+}
+async function supabasePushAll(){
+  try{
+    await supabaseRequire();
+    await supabaseUpsertTable("fin_accounts",supabaseRows("accounts"));
+    await supabaseUpsertTable("fin_transactions",supabaseRows("transactions"));
+    await supabaseUpsertTable("fin_debts",supabaseRows("debts"));
+    const prefs=(data&&data.meta)?{
+      budgets:data.meta.budgets||{}, emergencyGoal:data.meta.emergencyGoal||0,
+      subsOff:data.meta.subsOff||{}, portfolioCLP:data.meta.portfolioCLP||0
+    }:{};
+    const {error}=await sbClient.from("fin_prefs").upsert({user_id:sbUser.id,data:prefs,updated_at:new Date().toISOString()},{onConflict:"user_id"});
+    if(error) throw error;
+    setSupabaseStatus("Datos guardados en Supabase.","pos"); renderSupabaseCounts();
+  }catch(e){ setSupabaseStatus("Guardar Supabase: "+e.message,"neg"); throw e; }
+}
+
+function mergeByIdPreferLocal(localArr, remoteArr){
+  const map=new Map((remoteArr||[]).map(x=>[x.id,x]));
+  (localArr||[]).forEach(x=>{ if(x&&x.id) map.set(x.id,x); });
+  return [...map.values()];
+}
+async function supabasePullAll(opts){
+  opts=opts||{};
+  try{
+    await supabaseRequire();
+    const [a,t,d,p]=await Promise.all([
+      sbClient.from("fin_accounts").select("id,data,updated_at").eq("user_id",sbUser.id).order("updated_at",{ascending:true}),
+      sbClient.from("fin_transactions").select("id,data,updated_at").eq("user_id",sbUser.id).order("updated_at",{ascending:true}),
+      sbClient.from("fin_debts").select("id,data,updated_at").eq("user_id",sbUser.id).order("updated_at",{ascending:true}),
+      sbClient.from("fin_prefs").select("data").eq("user_id",sbUser.id).maybeSingle(),
+    ]);
+    [a,t,d,p].forEach(r=>{ if(r.error) throw r.error; });
+    const remote={accounts:(a.data||[]).map(r=>r.data),transactions:(t.data||[]).map(r=>r.data),debts:(d.data||[]).map(r=>r.data),meta:{}};
+    if(p.data&&p.data.data) remote.meta=Object.assign({},remote.meta,p.data.data);
+    if(!opts.allowEmpty && !remote.accounts.length && !remote.transactions.length && !remote.debts.length){
+      setSupabaseStatus("Supabase no tiene datos para cargar. Usa Migrar local → Supabase si quieres subir los datos actuales.","muted");
+      return;
+    }
+    const base = opts.cloudOnly ? {accounts:[],transactions:[],debts:[],meta:{}} : data;
+    data={
+      accounts: opts.cloudOnly ? remote.accounts : mergeByIdPreferLocal(base.accounts||[],remote.accounts),
+      transactions: opts.cloudOnly ? remote.transactions : mergeByIdPreferLocal(base.transactions||[],remote.transactions),
+      debts: opts.cloudOnly ? remote.debts : mergeByIdPreferLocal(base.debts||[],remote.debts),
+      meta: Object.assign({},base.meta||{},remote.meta||{})
+    };
+    if(!data.accounts.length && !opts.cloudOnly) data.accounts=defaultData().accounts;
+    if(!sbCloudOnly){
+      if(window.saveEnc) window.saveEnc(true); else localStorage.setItem(KEY,JSON.stringify(data));
+    }
+    savePrefs(); renderAll(); renderSupabaseCounts();
+    setSupabaseStatus(opts.cloudOnly?"Datos cargados desde Supabase.":"Datos mezclados desde Supabase sin borrar datos locales.","pos");
+  }catch(e){ setSupabaseStatus("Cargar Supabase: "+e.message,"neg"); throw e; }
+}
+function supabaseQueueSave(){
+  if(!sbReady) return;
+  if(sbSaveTimer) clearTimeout(sbSaveTimer);
+  sbSaveTimer=setTimeout(()=>supabasePushAll().catch(()=>{}),900);
+}
+async function supabaseSaveNow(){ try{ await supabasePushAll(); }catch(e){} }
+function renderSupabaseCounts(){
+  const el=document.getElementById("sb-counts"); if(!el) return;
+  el.textContent=`Actual: ${(data.accounts||[]).length} cuenta(s), ${(data.transactions||[]).length} movimiento(s), ${(data.debts||[]).length} deuda(s)${sbCloudOnly?" · modo Supabase sin copia local":""}.`;
 }
 
 /* ============ Utilidades ============ */
@@ -469,7 +695,7 @@ document.getElementById("nav").addEventListener("click",e=>{
 function renderAll(){
   renderDashboard(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderMesCat();
   renderBudget(); renderPie(); renderComparador(); renderSubs(); renderHormiga();
-  renderAnalisis(); renderStorageInfo();
+  renderAnalisis(); renderStorageInfo(); renderSupabaseCounts();
 }
 
 /* ============ Tema claro/oscuro ============ */
@@ -1430,6 +1656,7 @@ applyTheme(localStorage.getItem("finanzas_theme")||"light");
 document.getElementById("mv-date").value=todayStr();
 onTypeChange();
 renderAll();
+supabaseInit(); supabaseFillForms();
 fetchPortfolio();
 </script>
 <script>
@@ -1552,7 +1779,8 @@ fetchPortfolio();
       syncPull();             // traer preferencias de la nube y aplicarlas
     }catch(e){ err.textContent="Contraseña incorrecta"; }
   });
-  document.getElementById("lockp").focus();
+  supabaseFillForms();
+  (document.getElementById("sb-email-lock")||document.getElementById("lockp")).focus();
 })();
 </script>
 </body>
