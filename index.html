@@ -1305,6 +1305,16 @@ function findAccount(name){
   if(acc) return acc;
   return data.accounts.find(a=>{const an=normName(a.name); return an&&(an.includes(n)||n.includes(an));})||null;
 }
+function txDupKey(t){
+  return [
+    t.type||"",
+    (t.date||"").toString().slice(0,10),
+    Math.round(Number(t.amount)||0),
+    t.account||"",
+    t.to||"",
+    (t.desc||"").toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," "),
+  ].join("|");
+}
 function importMovements(){
   const out=document.getElementById("import-mv-result");
   const raw=document.getElementById("import-mv").value.trim();
@@ -1312,7 +1322,8 @@ function importMovements(){
   let arr;
   try{ arr=JSON.parse(raw); }catch(e){ out.innerHTML='<span class="neg">JSON inválido: '+e.message+'</span>'; return; }
   if(!Array.isArray(arr)){ out.innerHTML='<span class="neg">El JSON debe ser una lista [ ... ].</span>'; return; }
-  let added=0; const errors=[];
+  let added=0, skipped=0; const errors=[];
+  const seen=new Set(data.transactions.map(txDupKey));
   arr.forEach((m,i)=>{
     const amount=Number(m.amount);
     if(!amount||amount<=0){ errors.push(`#${i+1}: monto inválido`); return; }
@@ -1322,7 +1333,7 @@ function importMovements(){
     if(!["gasto","ingreso","transferencia"].includes(type)){ errors.push(`#${i+1}: tipo "${m.type}" no válido`); return; }
     const acc=findAccount(m.account);
     if(!acc){ errors.push(`#${i+1}: cuenta no reconocida "${m.account||""}"`); return; }
-    const tx={id:uid(),type,amount:Math.round(amount),date:(m.date||todayStr()).toString().slice(0,10),account:acc.id,desc:(m.desc||m.description||"").toString()};
+    const tx={id:uid(),type,amount:Math.round(amount),date:(m.date||todayStr()).toString().slice(0,10),account:acc.id,desc:(m.desc||m.description||"").toString().trim()};
     if(type==="gasto") tx.category=CATS.includes(m.category)?m.category:"Otros";
     else if(type==="ingreso") tx.category="Ingreso";
     else if(type==="transferencia"){
@@ -1331,10 +1342,14 @@ function importMovements(){
       if(to.id===acc.id){ errors.push(`#${i+1}: origen y destino iguales`); return; }
       tx.to=to.id;
     }
+    const key=txDupKey(tx);
+    if(seen.has(key)){ skipped++; return; }
+    seen.add(key);
     data.transactions.push(tx); added++;
   });
   if(added){ save(); renderAll(); document.getElementById("import-mv").value=""; }
   out.innerHTML=`<span class="pos">✓ ${added} movimiento(s) agregado(s).</span>`+
+    (skipped?` <span class="muted">${skipped} duplicado(s) omitido(s).</span>`:"")+
     (errors.length?` <span class="neg">${errors.length} con problema: ${errors.join("; ")}</span>`:"");
 }
 
