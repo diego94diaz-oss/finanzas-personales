@@ -409,6 +409,26 @@ async function boot(){
 function clp(n){ n=Math.round(n||0); return (n<0?"-$":"$")+Math.abs(n).toLocaleString("es-CL"); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function monthKey(dateStr){ return (dateStr||"").slice(0,7); }
+function dateKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function paidDebtMonth(d,mk){ return (d.payments||[]).some(p=>monthKey(p.date)===mk); }
+function debtDueInfo(d){
+  const hoy=new Date();
+  const today=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate());
+  const thisDue=new Date(hoy.getFullYear(),hoy.getMonth(),d.payDay||1);
+  let due=thisDue;
+  if(paidDebtMonth(d,monthKey(dateKey(thisDue)))){
+    due=new Date(hoy.getFullYear(),hoy.getMonth()+1,d.payDay||1);
+  }
+  return {
+    dias:Math.round((due-today)/86400000),
+    month:monthKey(dateKey(due)),
+    date:dateKey(due)
+  };
+}
+function pendingDebtPaymentsMonth(mk){
+  return data.debts.filter(d=>d.tipo==="credito"&&debtSaldo(d)>0&&!d.incluidoEn)
+    .reduce((s,d)=>debtDueInfo(d).month===mk?s+(d.cuota||0):s,0);
+}
 function monthLabel(key){
   if(!key) return "";
   const [y,m]=key.split("-");
@@ -504,7 +524,9 @@ function renderUpcoming(){
     return Math.round((d-new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()))/86400000);
   }
   data.debts.filter(d=>d.tipo==="credito"&&d.payDay&&debtSaldo(d)>0&&!d.incluidoEn).forEach(d=>{
-    items.push({n:`${d.name}`,sub:`Vence día ${d.payDay} · cuota ${(d.cuotasPagadas||0)+1}/${d.cuotasTotal}`,dia:String(d.payDay).padStart(2,"0"),dias:diasHasta(d.payDay),monto:d.cuota,color:"#f472b6"});
+    const due=debtDueInfo(d);
+    const day=Number((due.date||"").slice(8,10))||d.payDay;
+    items.push({n:`${d.name}`,sub:`Vence día ${day} · cuota ${(d.cuotasPagadas||0)+1}/${d.cuotasTotal}`,dia:String(day).padStart(2,"0"),dias:due.dias,monto:d.cuota,color:"#f472b6",dueMonth:due.month});
   });
   tarjetas().forEach(c=>{
     if(c.billingDay) items.push({n:`${c.name}`,sub:`Facturación · ${nextBilling(c.billingDay)}`,dia:String(c.billingDay).padStart(2,"0"),dias:diasHasta(c.billingDay),monto:c.utilizado||null,color:"#38bdf8"});
@@ -517,7 +539,7 @@ function renderUpcoming(){
   if(!items.length){ el.innerHTML=`<div class="empty">Sin pagos próximos.</div>`; return; }
   el.innerHTML=`<div class="pay-list">`+items.slice(0,4).map(i=>{
     const urgent=i.dias!==null&&i.dias<=5;
-    const sub=i.dias===null?i.sub:(i.dias===0?`${i.sub} · hoy`:`${i.sub} · en ${i.dias} día${i.dias===1?"":"s"}`);
+    const sub=i.dias===null?i.sub:(i.dias===0?`${i.sub} · hoy`:i.dias<0?`${i.sub} · atrasado ${Math.abs(i.dias)} día${i.dias===-1?"":"s"}`:`${i.sub} · en ${i.dias} día${i.dias===1?"":"s"}`);
     return `<div class="pay-item" style="background:${urgent?'rgba(244,114,182,.07)':'rgba(167,139,250,.07)'}">
       <div class="pay-date" style="background:${i.color}26;color:${i.color}">${i.dia}</div>
       <div style="flex:1;min-width:0"><div class="pay-title">${i.n}</div><div class="pay-sub">${sub}</div></div>
@@ -534,7 +556,7 @@ function renderProyeccion(){
   const diasMes=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate();
   const mk=monthKey(todayStr());
   const gas=sumByType("gasto",mk), ing=sumByType("ingreso",mk);
-  const pagosPendientes=data.debts.filter(d=>d.tipo==="credito"&&debtSaldo(d)>0&&!d.incluidoEn).reduce((s,d)=>s+(d.cuota||0),0);
+  const pagosPendientes=pendingDebtPaymentsMonth(mk);
   let proy=0, msg="Muy pronto para proyectar este mes.";
   if(dia>=3&&gas){
     proy=Math.round(gas/dia*diasMes);
