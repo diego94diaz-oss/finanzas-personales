@@ -1,0 +1,15 @@
+{
+  "name": "Mis Finanzas Personales",
+  "short_name": "Mis Finanzas",
+  "description": "Tu asesor financiero personal. Datos privados en tu equipo.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f9f5f1",
+  "theme_color": "#5934c5",
+  "lang": "es-CL",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
