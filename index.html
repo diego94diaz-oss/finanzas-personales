@@ -384,7 +384,7 @@ function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(data)); }catch(e){}
   if(!SB) return;
   clearTimeout(_syncTimer); setSyncStatus("pendiente");
-  _syncTimer=setTimeout(()=>{ cloudSync().catch(err=>{ console.error(err); setSyncStatus("error"); }); }, 1200);
+  _syncTimer=setTimeout(()=>{ cloudSync().catch(err=>{ console.warn("Sincronización Supabase falló; datos quedan en caché local.", err); setSyncStatus("error"); }); }, 1200);
 }
 
 function snapshot(){
@@ -444,7 +444,7 @@ async function doLogin(){
 async function logout(){ if(SB) await SB.auth.signOut(); location.reload(); }
 async function enterApp(){
   try{ await loadFromCloud(); }
-  catch(e){ console.error(e); try{ const raw=localStorage.getItem(KEY); if(raw) data=JSON.parse(raw); }catch(_){} }
+  catch(e){ console.warn("No se pudo cargar desde Supabase; usando caché local si existe.", e); try{ const raw=localStorage.getItem(KEY); if(raw) data=JSON.parse(raw); }catch(_){} }
   document.getElementById("auth-overlay").style.display="none";
   document.getElementById("mv-date").value=todayStr();
   onTypeChange(); onRecTypeChange();
