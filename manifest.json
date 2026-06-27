@@ -1,0 +1,15 @@
+{
+  "name": "Mis Finanzas Personales",
+  "short_name": "Mis Finanzas",
+  "description": "Tu asesor financiero personal, sincronizado en la nube.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0e0b1a",
+  "theme_color": "#0e0b1a",
+  "lang": "es-CL",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
