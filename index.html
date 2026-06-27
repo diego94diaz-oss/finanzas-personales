@@ -345,6 +345,9 @@
 const KEY = "finanzas_personales_v1";
 const PREFS_KEY = "fin_prefs";
 const CATS = ["Vivienda","Alimentación","Transporte","Servicios básicos","Deudas y cuotas","Salud","Cuidado personal","Entretenimiento","Suscripciones","Compras","Educación","Inversiones","Otros"];
+// Categorías de INGRESO (para distinguir sueldo de bonos y de transferencias de terceros que no son ingreso real)
+const CATS_ING = ["Sueldo","Horas Extraordinarias/Bonos","Reembolsos / Terceros","Otros ingresos"];
+function catsFor(type){ return type==="ingreso"?CATS_ING:CATS; }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
@@ -499,7 +502,8 @@ const CAT_COLORS={
   "Vivienda":"#5934c5","Alimentación":"#0e9f6e","Transporte":"#2596be","Servicios básicos":"#0284c7",
   "Deudas y cuotas":"#e0252b","Salud":"#ec5990","Cuidado personal":"#c026d3","Entretenimiento":"#ff7a1a",
   "Suscripciones":"#7b63f5","Compras":"#ca8a04","Educación":"#0d9488","Inversiones":"#16a34a",
-  "Otros":"#8895a7","Ingreso":"#0e9f6e"
+  "Otros":"#8895a7","Ingreso":"#0e9f6e",
+  "Sueldo":"#0e9f6e","Horas Extraordinarias/Bonos":"#0d9488","Reembolsos / Terceros":"#8895a7","Otros ingresos":"#16a34a"
 };
 function catColor(c){ return CAT_COLORS[c]||"#8895a7"; }
 function catEmoji(){ return ""; }   // el rediseño no usa emojis en los chips de categoría
@@ -860,7 +864,8 @@ function fillAccountSelects(){
   const opts=data.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
   document.getElementById("mv-account").innerHTML=opts;
   document.getElementById("mv-to").innerHTML=opts;
-  document.getElementById("mv-category").innerHTML=CATS.map(c=>`<option>${c}</option>`).join("");
+  const mt=(document.getElementById("mv-type")||{}).value||"gasto";
+  document.getElementById("mv-category").innerHTML=catsFor(mt).map(c=>`<option>${c}</option>`).join("");
 }
 
 /* ============ Presupuesto mensual por categoría ============ */
@@ -1332,8 +1337,10 @@ function delAccount(id){
 function onTypeChange(){
   const t=document.getElementById("mv-type").value;
   document.getElementById("mv-to-wrap").style.display = t==="transferencia"?"":"none";
-  document.getElementById("mv-cat-wrap").style.display = t==="gasto"?"":"none";
+  document.getElementById("mv-cat-wrap").style.display = (t==="gasto"||t==="ingreso")?"":"none";
   document.getElementById("mv-acc-label").textContent = t==="transferencia"?"Desde cuenta":(t==="ingreso"?"Cuenta destino":"Cuenta / medio");
+  const cs=document.getElementById("mv-category");
+  if(cs) cs.innerHTML=catsFor(t).map(c=>`<option>${c}</option>`).join("");
 }
 function addTransaction(){
   const type=document.getElementById("mv-type").value;
@@ -1341,8 +1348,7 @@ function addTransaction(){
   const date=document.getElementById("mv-date").value||todayStr();
   if(!amount||amount<=0){ alert("Ingresa un monto válido."); return; }
   const tx={id:uid(),type,amount,date,account:document.getElementById("mv-account").value,desc:document.getElementById("mv-desc").value.trim()};
-  if(type==="gasto") tx.category=document.getElementById("mv-category").value;
-  if(type==="ingreso") tx.category="Ingreso";
+  if(type==="gasto"||type==="ingreso") tx.category=document.getElementById("mv-category").value;
   if(type==="transferencia"){
     tx.to=document.getElementById("mv-to").value;
     if(tx.to===tx.account){ alert("La cuenta de origen y destino no pueden ser la misma."); return; }
@@ -1357,14 +1363,17 @@ function delTransaction(id){ if(!confirm("¿Eliminar este movimiento?")) return;
 function onRecTypeChange(){
   const sel=document.getElementById("rec-type"); if(!sel) return;
   const t=sel.value;
-  document.getElementById("rec-cat-wrap").style.display = t==="gasto"?"":"none";
+  document.getElementById("rec-cat-wrap").style.display = (t==="gasto"||t==="ingreso")?"":"none";
   document.getElementById("rec-acc-label").textContent = t==="ingreso"?"Cuenta destino":"Cuenta / medio";
+  const cs=document.getElementById("rec-category");
+  if(cs) cs.innerHTML=catsFor(t).map(c=>`<option value="${c}">${c}</option>`).join("");
 }
 function fillRecSelects(){
   const accSel=document.getElementById("rec-account"); if(!accSel) return;
   accSel.innerHTML=data.accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join("");
   const catSel=document.getElementById("rec-category");
-  if(catSel) catSel.innerHTML=CATS.map(c=>`<option value="${c}">${c}</option>`).join("");
+  const rt=(document.getElementById("rec-type")||{}).value||"gasto";
+  if(catSel) catSel.innerHTML=catsFor(rt).map(c=>`<option value="${c}">${c}</option>`).join("");
 }
 function addRecurring(){
   const type=document.getElementById("rec-type").value;
@@ -1375,7 +1384,7 @@ function addRecurring(){
   if(!data.meta) data.meta={}; if(!data.meta.recurring) data.meta.recurring=[];
   const r={id:uid(),type,day,amount:Math.round(amount),account:document.getElementById("rec-account").value,
     desc:document.getElementById("rec-desc").value.trim()};
-  if(type==="gasto") r.category=document.getElementById("rec-category").value;
+  if(type==="gasto"||type==="ingreso") r.category=document.getElementById("rec-category").value;
   data.meta.recurring.push(r);
   document.getElementById("rec-amount").value=""; document.getElementById("rec-desc").value=""; document.getElementById("rec-day").value="";
   applyRecurring(); save(); renderAll();
@@ -1403,7 +1412,7 @@ function applyRecurring(){
     const tx={id:uid(),type:r.type,amount:r.amount,date:`${mk}-${String(dia).padStart(2,"0")}`,
       account:r.account,desc:r.desc||"",recId:r.id,recMonth:mk};
     if(r.type==="gasto") tx.category=r.category||"Otros";
-    else if(r.type==="ingreso") tx.category="Ingreso";
+    else if(r.type==="ingreso") tx.category=r.category||"Otros ingresos";
     data.transactions.push(tx); changed=true;
   });
   if(changed) save();
@@ -1424,7 +1433,7 @@ function renderRecurring(){
     return `<tr style="${r.paused?'opacity:.55':''}">
       <td><span class="pill" style="background:${tipoCol}1f;color:${tipoCol}">${r.type==="ingreso"?"Ingreso":"Gasto"}</span></td>
       <td>día ${r.day}</td>
-      <td>${r.type==="gasto"?catChip(r.category||"Otros"):"—"}</td>
+      <td>${catChip(r.category||(r.type==="ingreso"?"Otros ingresos":"Otros"))}</td>
       <td>${accName(r.account)}</td>
       <td>${r.desc||"—"}</td>
       <td class="${r.type==="ingreso"?'pos':'neg'}" style="text-align:right;font-weight:600">${clp(r.amount)}</td>
@@ -1446,13 +1455,14 @@ function openEditModal(id){
   const t=data.transactions.find(x=>x.id===id); if(!t) return;
   EDIT_ID=id;
   const accOpts=sel=>data.accounts.map(a=>`<option value="${a.id}" ${a.id===sel?"selected":""}>${a.name}</option>`).join("");
-  const catOpts=sel=>CATS.map(c=>`<option value="${c}" ${c===sel?"selected":""}>${c}</option>`).join("");
+  const catOpts=(sel,type)=>catsFor(type).map(c=>`<option value="${c}" ${c===sel?"selected":""}>${c}</option>`).join("");
   let html=`<div class="row">
     <div><label>Fecha</label><input type="date" id="ed-date" value="${t.date||todayStr()}"></div>
     <div><label>Monto (CLP)</label><input type="number" id="ed-amount" value="${t.amount}"></div>
     <div><label>${t.type==="transferencia"?"Desde cuenta":(t.type==="ingreso"?"Cuenta destino":"Cuenta / medio")}</label><select id="ed-account">${accOpts(t.account)}</select></div>`;
   if(t.type==="transferencia") html+=`<div><label>Hacia cuenta</label><select id="ed-to">${accOpts(t.to)}</select></div>`;
-  if(t.type==="gasto") html+=`<div><label>Categoría</label><select id="ed-category">${catOpts(t.category||"Otros")}</select></div>`;
+  if(t.type==="gasto") html+=`<div><label>Categoría</label><select id="ed-category">${catOpts(t.category||"Otros","gasto")}</select></div>`;
+  if(t.type==="ingreso") html+=`<div><label>Categoría</label><select id="ed-category">${catOpts(t.category||"Otros ingresos","ingreso")}</select></div>`;
   html+=`<div style="flex:2"><label>Descripción</label><input id="ed-desc" value="${(t.desc||"").replace(/"/g,"&quot;")}"></div></div>`;
   if(t.recId) html+=`<div class="tip small" style="margin-top:12px">🔁 Este movimiento lo generó un fijo recurrente. Editarlo solo afecta a este mes.</div>`;
   if(t.type==="gasto"){
@@ -1474,6 +1484,7 @@ function saveEditModal(){
   t.date=document.getElementById("ed-date").value||t.date;
   t.account=document.getElementById("ed-account").value;
   t.desc=document.getElementById("ed-desc").value.trim();
+  if(t.type==="ingreso") t.category=document.getElementById("ed-category").value;
   if(t.type==="gasto"){ t.category=document.getElementById("ed-category").value;
     const on=document.getElementById("ed-rule-on"); const match=(document.getElementById("ed-rule-match").value||"").trim();
     if(on&&on.checked&&match){ addCatRuleObj(match,t.category); }
@@ -1587,7 +1598,7 @@ function importMovements(){
     if(!acc){ errors.push(`#${i+1}: cuenta no reconocida "${m.account||""}"`); return; }
     const tx={id:uid(),type,amount:Math.round(amount),date:(m.date||todayStr()).toString().slice(0,10),account:acc.id,desc:(m.desc||m.description||"").toString()};
     if(type==="gasto") tx.category=CATS.includes(m.category)?m.category:"Otros";
-    else if(type==="ingreso") tx.category="Ingreso";
+    else if(type==="ingreso") tx.category=CATS_ING.includes(m.category)?m.category:(m.category==="Ingreso"?"Ingreso":"Otros ingresos");
     else if(type==="transferencia"){
       const to=findAccount(m.to||m.toAccount);
       if(!to){ errors.push(`#${i+1}: cuenta destino no reconocida "${m.to||m.toAccount||""}"`); return; }
