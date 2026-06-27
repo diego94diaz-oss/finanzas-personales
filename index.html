@@ -233,6 +233,12 @@
       </div>
     </div>
     <div class="panel">
+      <h2>🏷️ Separar mis sueldos</h2>
+      <p class="small muted">Recorre tus ingresos "Pago Proveedores" de Banco Falabella y los marca como <b>Sueldo</b> (≥ $2.000.000) u <b>Horas Extraordinarias/Bonos</b> (menor). Úsalo una vez para separar tus sueldos de los demás ingresos. Se guarda y sincroniza solo.</p>
+      <div class="flex"><button class="btn ghost" onclick="reclasificarSueldos()">Separar mis sueldos</button>
+        <span id="reclasif-result" class="small"></span></div>
+    </div>
+    <div class="panel">
       <h2>Historial de movimientos</h2>
       <div class="flex" style="margin-bottom:10px">
         <select id="filter-type" onchange="renderTransactions()" style="max-width:180px">
@@ -1610,6 +1616,24 @@ function importMovements(){
   if(added){ applyCatRules(); save(); renderAll(); document.getElementById("import-mv").value=""; }
   out.innerHTML=`<span class="pos">✓ ${added} movimiento(s) agregado(s).</span>`+
     (errors.length?` <span class="neg">${errors.length} con problema: ${errors.join("; ")}</span>`:"");
+}
+
+/* Reclasifica los ingresos "Pago Proveedores" de Falabella: ≥$2M → Sueldo, menor → Horas Extra/Bonos */
+function reclasificarSueldos(){
+  const out=document.getElementById("reclasif-result");
+  const fala=data.accounts.find(a=>/falabella/i.test(a.name||""));
+  if(!fala){ if(out) out.innerHTML='<span class="neg">No encuentro la cuenta Banco Falabella.</span>'; return; }
+  let n=0;
+  data.transactions.forEach(t=>{
+    if(t.type!=="ingreso" || t.account!==fala.id) return;
+    if(!/proveedor/i.test(t.desc||"")) return;
+    const cat=t.amount>=2000000?"Sueldo":"Horas Extraordinarias/Bonos";
+    if(t.category!==cat){ t.category=cat; n++; }
+  });
+  if(n){ save(); renderAll(); }
+  if(out) out.innerHTML=n
+    ? `<span class="pos">✓ ${n} ingreso(s) reclasificados (≥$2M → Sueldo · menor → Horas Extra/Bonos).</span>`
+    : `<span class="muted">No había ingresos por reclasificar.</span>`;
 }
 
 function addDebt(){
