@@ -15,6 +15,14 @@ ROOT = Path(__file__).resolve().parents[1]
 CRITICAL_ASSETS = ['index.html', 'manifest.json', 'icon.svg', 'sw.js', 'datos_cifrados.js']
 
 
+def is_within_root(path: Path) -> bool:
+    try:
+        path.relative_to(ROOT.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args):
         return
@@ -63,7 +71,7 @@ def main() -> None:
         if ref.startswith(('http://', 'https://', '#', 'mailto:', 'tel:', 'data:', '//')):
             continue
         path = (ROOT / ref.split('?', 1)[0].split('#', 1)[0]).resolve()
-        if not path.exists():
+        if not is_within_root(path) or not path.exists():
             missing.append(ref)
     if missing:
         raise SystemExit('MISSING_ASSETS ' + ', '.join(missing[:20]))
@@ -87,8 +95,8 @@ def main() -> None:
     if not icons:
         raise SystemExit('manifest.json sin icons[]')
     for icon in icons:
-        icon_path = ROOT / str(icon.get('src') or '').split('?', 1)[0]
-        if not icon_path.exists():
+        icon_path = (ROOT / str(icon.get('src') or '').split('?', 1)[0]).resolve()
+        if not is_within_root(icon_path) or not icon_path.exists():
             raise SystemExit(f'Icono de manifest ausente: {icon}')
 
     sw = (ROOT / 'sw.js').read_text(encoding='utf-8', errors='replace')
@@ -110,11 +118,11 @@ def main() -> None:
             target = ROOT / 'index.html'
         else:
             target = (ROOT / clean.lstrip('./')).resolve()
-        if not target.exists():
+        if not is_within_root(target) or not target.exists():
             obsolete.append(rel)
     if obsolete:
         raise SystemExit('sw.js contiene rutas obsoletas: ' + ', '.join(obsolete))
-    print(f'SW_CACHE {cache_match.group(1)} assets={len(cached_assets)}')
+
 
     serve_and_fetch()
 
