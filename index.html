@@ -848,7 +848,8 @@ function renderSalud(){
 
   const inversionesLabel = PORTFOLIO_LIVE?"inversiones a precio actual":"inversiones al último valor guardado";
   const coberturaTxt = s.coberturaMeses===null?"Sin base suficiente":`${s.coberturaMeses.toFixed(1)} meses`;
-  const deudaRatio = s.liquidez>0?Math.round(s.pasivos/s.liquidez*100):null;
+  const razonEndeudamiento = s.activos>0 ? Math.round(s.pasivos/s.activos*100) : null;
+  const pasivosLiquidezRatio = s.liquidez>0 ? Math.round(s.pasivos/s.liquidez*100) : null;
   const deudaLiquidezPct = s.liquidez>0 ? clampPct(s.pasivos/s.liquidez*100) : 100;
   const ahorroPct = s.flow.ingresos>0 ? clampPct(Math.abs(s.flow.neto)/s.flow.ingresos*100) : 0;
   const flowLabel = s.flow.neto>=0 ? "colchón generado este mes" : "déficit del mes actual";
@@ -913,14 +914,14 @@ function renderSalud(){
       <div class="stat-box"><small>Tasa de ahorro</small><b class="${s.tasaAhorro>=0?'pos':'neg'}">${s.tasaAhorro}%</b></div>
       <div class="stat-box"><small>Cobertura con tu liquidez</small><b>${coberturaTxt}</b></div>
       <div class="stat-box"><small>Pagos de deuda del mes</small><b>${clp(s.obligacionesMes)}</b></div>
-      <div class="stat-box"><small>Ratio deuda / liquidez</small><b>${deudaRatio===null?'—':deudaRatio+'%'}</b><span class="tiny-note">${deudaRatio===null?'Sin liquidez para comparar.':deudaRatio<=60?'Bajo control.':deudaRatio<=100?'Vigilado.':'Presionado.'}</span></div>
+      <div class="stat-box"><small>Razón de endeudamiento</small><b>${razonEndeudamiento===null?'—':razonEndeudamiento+'%'}</b><span class="tiny-note">${razonEndeudamiento===null?'Sin activos para comparar.':razonEndeudamiento<=40?'Bajo control.':razonEndeudamiento<=70?'Vigilado.':'Alto.'}</span></div>
     </div>
     <div class="mini-divider"></div>
     <div class="small muted">Lectura rápida:</div>
     <div class="stack-list" style="margin-top:10px">
       <div class="stack-row"><span class="stack-label">Saldo actual disponible</span><span class="stack-value">${clp(s.liquidez)}</span></div>
       <div class="stack-row"><span class="stack-label">Flujo del mes</span><span class="stack-value ${s.flow.neto>=0?'pos':'neg'}">${clp(s.flow.neto)}</span></div>
-      <div class="stack-row"><span class="stack-label">Pasivos vs liquidez</span><span class="stack-value">${deudaRatio===null?'—':deudaLiquidezPct+'%'}</span></div>
+      <div class="stack-row"><span class="stack-label">Pasivos vs liquidez</span><span class="stack-value">${pasivosLiquidezRatio===null?'—':deudaLiquidezPct+'%'}</span></div>
       <div class="stack-row"><span class="stack-label">Fuente de inversiones</span><span class="stack-value" style="font-size:13px">${inversionesLabel}</span></div>
     </div>`;
 
