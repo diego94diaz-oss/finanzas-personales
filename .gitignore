@@ -1,0 +1,8 @@
+# Nunca subir credenciales/llaves a este repo público.
+.env
+.env.*
+*.env
+.finanzas.env
+*_key.txt
+*credenciales*
+*service_role*
