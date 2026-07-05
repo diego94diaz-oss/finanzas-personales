@@ -131,7 +131,7 @@
         <div class="panel" id="dash-pagos-panel">
           <div class="flex" style="justify-content:space-between;margin-bottom:14px">
             <h2 style="margin:0">Próximos pagos</h2>
-            <span class="small" style="color:var(--accent)">Ver todos</span>
+            <span class="small" style="color:var(--accent);cursor:pointer" onclick="document.querySelector('#nav button[data-tab=plan]').click()">Ver todos</span>
           </div>
           <div id="dash-pagos"></div>
         </div>
@@ -377,6 +377,7 @@ const CATS_ING = ["Sueldo","Horas Extraordinarias/Bonos","Reembolsos / Terceros"
 function catsFor(type){ return type==="ingreso"?CATS_ING:CATS; }
 
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function defaultData(){
   return {
@@ -441,6 +442,7 @@ async function cloudSync(){
 
 async function loadFromCloud(){
   const u=(await SB.auth.getUser()).data?.user;
+  if(!u) throw new Error("Sesión expirada");
   const [acc,tx,deb,pref]=await Promise.all([
     SB.from("fin_accounts").select("data").eq("user_id",u.id),
     SB.from("fin_transactions").select("data").eq("user_id",u.id),
@@ -448,6 +450,9 @@ async function loadFromCloud(){
     SB.from("fin_prefs").select("data").eq("user_id",u.id).maybeSingle(),
   ]);
   if(acc.error) throw acc.error;
+  if(tx.error) throw tx.error;
+  if(deb.error) throw deb.error;
+  if(pref.error) throw pref.error;
   data={
     accounts:(acc.data||[]).map(r=>r.data),
     transactions:(tx.data||[]).map(r=>r.data).sort((a,b)=>(a.date||"").localeCompare(b.date||"")),
@@ -782,10 +787,12 @@ async function fetchPortfolio(){
     // 2) Si no está (otro navegador / versión local), leer los valores publicados
     if(!usd||!clpHold){
       const r=await fetch("https://diego94diaz-oss.github.io/portfolio-dashboard/",{cache:"no-store"});
-      const txt=await r.text();
-      usd=usd||parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-      clpHold=clpHold||parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-      rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
+      if(r.ok){
+        const txt=await r.text();
+        usd=usd||parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+        clpHold=clpHold||parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
+        rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
+      }
     }
     try{
       const fx=await fetch("https://open.er-api.com/v6/latest/USD");
@@ -1697,7 +1704,7 @@ function renderCatRules(){
   if(!rules.length){ el.innerHTML=`<div class="empty">Sin reglas todavía. Crea una arriba, o desde el lápiz ✏️ de cualquier gasto.</div>`; return; }
   const rows=rules.map(r=>{
     const n=data.transactions.filter(t=>t.type==="gasto"&&(t.desc||"").toLowerCase().includes(r.match)).length;
-    return `<tr><td><span class="muted">contiene</span> <b>"${r.match}"</b></td><td>→ ${catChip(r.category)}</td>
+    return `<tr><td><span class="muted">contiene</span> <b>"${escHtml(r.match)}"</b></td><td>→ ${catChip(r.category)}</td>
       <td class="muted" style="text-align:right">${n} gasto${n===1?"":"s"}</td>
       <td style="text-align:right"><button class="icon-del" onclick="delCatRule('${r.id}')">✕</button></td></tr>`;
   }).join("");
@@ -1768,7 +1775,7 @@ function importMovements(){
   });
   if(added){ applyCatRules(); save(); renderAll(); document.getElementById("import-mv").value=""; }
   out.innerHTML=`<span class="pos">✓ ${added} movimiento(s) agregado(s).</span>`+
-    (errors.length?` <span class="neg">${errors.length} con problema: ${errors.join("; ")}</span>`:"");
+    (errors.length?` <span class="neg">${errors.length} con problema: ${errors.map(escHtml).join("; ")}</span>`:"");
 }
 
 /* Reclasifica los ingresos "Pago Proveedores" de Falabella: ≥$2M → Sueldo, menor → Horas Extra/Bonos */
