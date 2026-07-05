@@ -1,7 +1,7 @@
 /* Service worker — Mis Finanzas (versión Supabase).
    Cachea solo el shell de la app (same-origin) para que abra rápido y offline.
    Las llamadas a Supabase y a las fuentes (cross-origin) pasan directo a la red. */
-const CACHE = "finanzas-sb-v4";
+const CACHE = "finanzas-sb-v5";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./datos_cifrados.js"];
 
 self.addEventListener("install", e => {
@@ -18,7 +18,10 @@ self.addEventListener("fetch", e => {
   if (req.method !== "GET") return;
   if (new URL(req.url).origin !== location.origin) return;   // Supabase / fuentes: directo a la red
   e.respondWith(
-    fetch(req).then(res => {
+    // "no-store": ignora la caché HTTP del navegador (GitHub Pages manda Cache-Control:
+    // max-age=600, que puede servir un index.html viejo aunque el SW pida "red primero"
+    // si no se le fuerza a saltarse esa caché intermedia).
+    fetch(req, { cache: "no-store" }).then(res => {
       const cp = res.clone();
       caches.open(CACHE).then(c => c.put(req, cp));
       return res;
