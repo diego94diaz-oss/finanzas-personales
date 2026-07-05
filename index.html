@@ -569,9 +569,69 @@ function cashFlowForMonth(mk){
   return { ingresos, gastos, neto:ingresos-gastos };
 }
 function clampPct(n){ return Math.max(0, Math.min(100, Math.round(n||0))); }
+
+/* Gasto "variable" del mes = gasto total menos cuotas de deudas (esas son fijas y
+   suelen pagarse a inicio de mes, distorsionando cualquier promedio simple diario). */
+function gastoVariableMes(mk){
+  return data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk&&t.category!=="Deudas y cuotas")
+    .reduce((s,t)=>s+t.amount,0);
+}
+function diasDelMes(mk){ const [y,m]=mk.split("-").map(Number); return new Date(y,m,0).getDate(); }
+function mediana(arr){
+  if(!arr.length) return 0;
+  const s=[...arr].sort((a,b)=>a-b), mid=Math.floor(s.length/2);
+  return s.length%2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+
+/* Proyección de fin de mes: separa gasto fijo (cuotas con día de pago) de gasto
+   variable (todo lo demás), y proyecta el sueldo pendiente si aún no llega este mes.
+   Fuente única para el dashboard y para Salud financiera. */
+function proyeccionMes(){
+  const mk=monthKey(todayStr());
+  const hoy=new Date(), dia=hoy.getDate();
+  const diasMes=diasDelMes(mk), diasRestantes=Math.max(0,diasMes-dia);
+
+  const gastadoHoy=sumByType("gasto",mk);
+  const ingresadoHoy=sumByType("ingreso",mk);
+
+  const mesesPrevios=monthsSpan().filter(m=>m<mk);
+  const prev3=mesesPrevios.slice(0,3);
+  const tasasHist=prev3.map(m=>gastoVariableMes(m)/diasDelMes(m)).filter(x=>x>0);
+  let tasaVarDiaria=mediana(tasasHist);
+  if(!tasaVarDiaria && dia>=3) tasaVarDiaria=gastoVariableMes(mk)/dia;
+  const variableRestante=Math.round((tasaVarDiaria||0)*diasRestantes);
+  const promVariablePrev=prev3.length?Math.round(prev3.reduce((s,m)=>s+gastoVariableMes(m),0)/prev3.length):0;
+  const variableProyectado=gastoVariableMes(mk)+variableRestante;
+
+  const pagosPendientes=pendingDebtPaymentsMonth(mk);
+  const proyGastos=Math.round(gastadoHoy+variableRestante+pagosPendientes);
+
+  // Sueldo esperado: si este mes aún no se registra un ingreso "Sueldo", se proyecta
+  // el promedio (monto y día) de los últimos sueldos registrados. Bonos/horas extra no
+  // se proyectan (conservador).
+  const sueldoEsteMes=data.transactions.some(t=>t.type==="ingreso"&&monthKey(t.date)===mk&&t.category==="Sueldo");
+  const sueldoTx=[];
+  for(const m of mesesPrevios){
+    const s=data.transactions.filter(t=>t.type==="ingreso"&&monthKey(t.date)===m&&t.category==="Sueldo");
+    if(s.length) sueldoTx.push(...s);
+    if(sueldoTx.length>=3) break;
+  }
+  const montoSueldoEsperado=sueldoTx.length?Math.round(sueldoTx.reduce((s,t)=>s+t.amount,0)/sueldoTx.length):0;
+  const diaSueldoEsperado=sueldoTx.length?Math.round(sueldoTx.reduce((s,t)=>s+Number((t.date||"").slice(8,10)||0),0)/sueldoTx.length):24;
+  const sueldoPendiente=!sueldoEsteMes && montoSueldoEsperado>0;
+  const proyIngresos=Math.round(ingresadoHoy+(sueldoPendiente?montoSueldoEsperado:0));
+
+  const cierreCaja=Math.round(totalBalance()+(sueldoPendiente?montoSueldoEsperado:0)-variableRestante-pagosPendientes);
+
+  return { mk, dia, diasMes, diasRestantes, gastadoHoy, ingresadoHoy, tasaVarDiaria,
+    variableRestante, promVariablePrev, variableProyectado, pagosPendientes, proyGastos,
+    sueldoPendiente, montoSueldoEsperado, diaSueldoEsperado, proyIngresos,
+    flujoProy: proyIngresos-proyGastos, cierreCaja };
+}
+
 function healthTone(s){
   if(s.patrimonio < 0 || (s.deudaTarjetas > s.liquidez && s.liquidez>0)) return { label:"Atención", cls:"pink", icon:"⚠" };
-  if(s.flow.neto < 0 || (s.coberturaMeses !== null && s.coberturaMeses < 1.5)) return { label:"Ajustado", cls:"pink", icon:"◔" };
+  if(s.proy.flujoProy < 0 || (s.coberturaMeses !== null && s.coberturaMeses < 1.5)) return { label:"Ajustado", cls:"pink", icon:"◔" };
   return { label:"Sano", cls:"", icon:"●" };
 }
 function financialSnapshot(){
@@ -592,7 +652,8 @@ function financialSnapshot(){
   const coberturaMeses=gastoBase>0?liquidez/gastoBase:null;
   const obligacionesMes=pendingDebtPaymentsMonth(mk);
   const leveragePct=pasivos>0 && activos>0 ? pasivos/activos*100 : 0;
-  return { mk, liquidez, efectivo, bancos, inversiones, activos, deudaDeudas, deudaTarjetas, pasivos, patrimonio, flow, tasaAhorro, gastoBase, coberturaMeses, obligacionesMes, leveragePct };
+  const proy=proyeccionMes();
+  return { mk, liquidez, efectivo, bancos, inversiones, activos, deudaDeudas, deudaTarjetas, pasivos, patrimonio, flow, tasaAhorro, gastoBase, coberturaMeses, obligacionesMes, leveragePct, proy };
 }
 
 function debtPaid(d){ return (d.payments||[]).reduce((s,p)=>s+p.amount,0); }
@@ -678,30 +739,22 @@ function renderUpcoming(){
 function renderProyeccion(){
   const hidden=document.getElementById("dash-proyeccion");
   const card=document.getElementById("dash-proyeccion-card");
-  const hoy=new Date(), dia=hoy.getDate();
-  const diasMes=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate();
-  const mk=monthKey(todayStr());
-  const gas=sumByType("gasto",mk), ing=sumByType("ingreso",mk);
-  const pagosPendientes=pendingDebtPaymentsMonth(mk);
-  let proy=0, msg="Muy pronto para proyectar este mes.";
-  if(dia>=3&&gas){
-    proy=Math.round(gas/dia*diasMes);
-    const prev=monthsSpan().filter(m=>m<mk).slice(0,3);
-    const promPrev=prev.length?Math.round(prev.reduce((s,m)=>s+sumByType("gasto",m),0)/prev.length):0;
-    const vsIngreso=ing?proy-ing:null;
-    if(vsIngreso!==null&&vsIngreso>0) msg=`Sobre ingresos por ${clp(vsIngreso)}`;
-    else if(promPrev&&proy>promPrev) msg=`Sobre promedio ${clp(promPrev)}`;
-    else msg=promPrev?`Bajo promedio ${clp(promPrev)}`:"Ritmo saludable";
-  }
-  const cierre=ing?ing-proy-pagosPendientes:totalBalance()-proy-pagosPendientes;
+  const p=proyeccionMes();
+  let msg;
+  if(p.dia<3 && !p.gastadoHoy) msg="Muy pronto para proyectar este mes.";
+  else if(p.promVariablePrev && p.variableProyectado>p.promVariablePrev*1.15) msg=`Gasto variable sobre tu promedio (${clp(p.promVariablePrev)}/mes)`;
+  else if(p.promVariablePrev) msg=`Gasto variable dentro de tu ritmo habitual (~${clp(p.promVariablePrev)}/mes)`;
+  else msg="Ritmo saludable";
+  if(p.sueldoPendiente) msg+=` · sueldo pendiente (~día ${p.diaSueldoEsperado})`;
   if(hidden) hidden.innerHTML=`<div class="tip">${msg}</div>`;
   if(card) card.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between"><div class="kicker">Proyección fin de mes</div><span style="width:8px;height:8px;border-radius:50%;background:var(--cyan);animation:floatpulse 2.4s infinite"></span></div>
-    <div class="metric-value" style="color:var(--green)">${clp(cierre)}</div>
+    <div class="metric-value" style="color:${p.cierreCaja>=0?'var(--green)':'var(--red)'}">${clp(p.cierreCaja)}</div>
     <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
-      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>Ingresos mes</span><span class="num" style="color:#d8d2ec">${clp(ing)}</span></div>
-      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>− Gastos proyectados</span><span class="num" style="color:#d8d2ec">${proy?clp(proy):"—"}</span></div>
-      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>− Pagos pendientes</span><span class="num" style="color:#d8d2ec">${clp(pagosPendientes)}</span></div>
+      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>Saldo líquido hoy</span><span class="num" style="color:#d8d2ec">${clp(totalBalance())}</span></div>
+      ${p.sueldoPendiente?`<div style="display:flex;justify-content:space-between;color:var(--muted)"><span>+ Sueldo esperado (~día ${p.diaSueldoEsperado})</span><span class="num pos">${clp(p.montoSueldoEsperado)}</span></div>`:""}
+      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>− Gasto variable restante</span><span class="num" style="color:#d8d2ec">${clp(p.variableRestante)}</span></div>
+      <div style="display:flex;justify-content:space-between;color:var(--muted)"><span>− Cuotas pendientes</span><span class="num" style="color:#d8d2ec">${clp(p.pagosPendientes)}</span></div>
     </div>`;
 }
 
@@ -882,18 +935,20 @@ function renderSalud(){
       <div class="stat-box"><small>Efectivo</small><b>${clp(s.efectivo)}</b></div>
     </div>`;
 
+  const flowProyLabel = s.proy.sueldoPendiente ? `incluye sueldo esperado ~día ${s.proy.diaSueldoEsperado}` : "proyección a fin de mes";
   flowCard.innerHTML=`
     <div>
       <div class="kicker">Cash flow · ${monthLabel(s.mk)}</div>
       <div class="metric-value ${s.flow.neto>=0?'pos':'neg'}">${clp(s.flow.neto)}</div>
-      <div class="small muted" style="margin-top:8px">flujo neto real del mes actual</div>
+      <div class="small muted" style="margin-top:8px">flujo neto real a la fecha</div>
       <div class="progress"><div style="width:${ahorroPct}%;background:linear-gradient(90deg,${s.flow.neto>=0?'var(--green)':'var(--red)'},var(--accent2))"></div></div>
       <span class="tiny-note">${flowLabel} · ${ahorroPct}% de tus ingresos del mes.</span>
     </div>
     <div class="stat-grid">
       <div class="stat-box"><small>Ingresos</small><b class="pos">${clp(s.flow.ingresos)}</b></div>
       <div class="stat-box"><small>Gastos</small><b class="neg">${clp(s.flow.gastos)}</b></div>
-    </div>`;
+    </div>
+    <div class="health-note">Proyectado a fin de mes: <strong class="${s.proy.flujoProy>=0?'pos':'neg'}">${clp(s.proy.flujoProy)}</strong> · ${flowProyLabel}.</div>`;
 
   balance.innerHTML=`
     <h2>Balance general</h2>
