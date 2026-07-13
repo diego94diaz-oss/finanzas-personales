@@ -825,39 +825,35 @@ function inversionesTotal(){
   return data.transactions.filter(t=>t.type==="gasto"&&t.category==="Inversiones").reduce((s,t)=>s+t.amount,0);
 }
 
-/* Portafolio de inversiones (dashboard hermano en el mismo dominio) */
+/* Portafolio de inversiones — valor en vivo desde el dashboard de portafolio
+   (repo portafolio-dashboard). Ese dashboard publica un snapshot en el mismo Supabase
+   (bucket privado dashboard-data/data.json). Se toma el CONSOLIDADO en CLP:
+   endpoints["/api/summary|currency=CLP"].total_value (EEUU + Chile, ya en pesos). */
 let PORTFOLIO_CLP=null, PORTFOLIO_LIVE=false;
 function portfolioValue(){
   return PORTFOLIO_CLP || (data.meta&&data.meta.portfolioCLP) || null;
 }
 async function fetchPortfolio(){
   try{
-    // 1) Valor con precios en vivo: el portfolio-dashboard (mismo dominio) lo deja
-    //    calculado en localStorage cada vez que se abre. Es el más actualizado.
-    let usd=parseFloat(localStorage.getItem("combined_total_usd"))||null;
-    let clpHold=parseFloat(localStorage.getItem("combined_total_clp"))||null;
-    let rate=null, sync=!!(usd&&clpHold);
-    // 2) Si no está (otro navegador / versión local), leer los valores publicados
-    if(!usd||!clpHold){
-      const r=await fetch("https://diego94diaz-oss.github.io/portfolio-dashboard/",{cache:"no-store"});
-      if(r.ok){
-        const txt=await r.text();
-        usd=usd||parseFloat((txt.match(/USD_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-        clpHold=clpHold||parseFloat((txt.match(/CLP_FALLBACK\s*=\s*([0-9.]+)/)||[])[1]);
-        rate=parseFloat((txt.match(/FX_FALLBACK\s*=\s*([0-9.]+)/)||[])[1])||950;
-      }
-    }
-    try{
-      const fx=await fetch("https://open.er-api.com/v6/latest/USD");
-      const d=await fx.json(); if(d&&d.rates&&d.rates.CLP) rate=d.rates.CLP;
-    }catch(e){}
-    if(usd&&clpHold&&rate){
-      PORTFOLIO_CLP=Math.round(clpHold+usd*rate);
-      PORTFOLIO_LIVE=sync;
-      if(data.meta){ data.meta.portfolioCLP=PORTFOLIO_CLP; save(); } // recordar último valor
+    if(!SB || !window.FIN_CONFIG) return;
+    const sess=(await SB.auth.getSession()).data.session;
+    if(!sess) return;   // el bucket es privado: requiere la sesión del usuario logueado
+    const url=window.FIN_CONFIG.SUPABASE_URL+"/storage/v1/object/dashboard-data/data.json?v="+Date.now();
+    const r=await fetch(url,{cache:"no-store",headers:{
+      apikey:window.FIN_CONFIG.SUPABASE_ANON_KEY,
+      Authorization:"Bearer "+sess.access_token }});
+    if(!r.ok) return;
+    const snap=await r.json();
+    const cons=snap&&snap.endpoints&&snap.endpoints["/api/summary|currency=CLP"];
+    const clpTotal=cons?Number(cons.total_value):0;
+    if(clpTotal>0){
+      PORTFOLIO_CLP=Math.round(clpTotal);
+      PORTFOLIO_LIVE=true;
+      if(data.meta){ data.meta.portfolioCLP=PORTFOLIO_CLP; data.meta.portfolioAt=snap.asof_date||todayStr(); save(); }
       renderDashboard();
+      if(typeof renderSalud==="function") renderSalud();
     }
-  }catch(e){ /* sin conexión: se usa el valor guardado */ }
+  }catch(e){ /* sin conexión / snapshot no disponible: se usa el último valor guardado */ }
 }
 
 function renderDashboard(){
@@ -884,7 +880,7 @@ function renderDashboard(){
   const cards=[
     {h:"Ingresos del mes",v:clp(ingMes),c:"pos"},
     {h:"Gastos del mes",v:clp(gasMes),c:"neg"},
-    {h:"Inversiones",v:inv!==null?clp(inv):clp(inversionesTotal()),c:"pos",s:inv!==null?(PORTFOLIO_LIVE?"precios del momento":"último valor conocido"):"aportes registrados"},
+    {h:"Inversiones",v:inv!==null?clp(inv):clp(inversionesTotal()),c:"pos",s:inv!==null?(PORTFOLIO_LIVE?("portafolio consolidado · "+((data.meta&&data.meta.portfolioAt)||"hoy")):"último valor conocido"):"aportes registrados"},
     {h:"Patrimonio neto",v:clp(patrimonio),c:patrimonio>=0?"pos":"neg",s:"líquido + inversiones − deudas"},
   ];
   document.getElementById("dash-cards").innerHTML=cards.map(c=>`<div class="card"><h3>${c.h}</h3><div class="big ${c.c}">${c.v}</div>${c.s?`<div class="small muted" style="margin-top:4px">${c.s}</div>`:""}</div>`).join("");
@@ -906,7 +902,7 @@ function renderSalud(){
   const concepts=document.getElementById("health-concepts");
   if(!hero||!liqCard||!flowCard||!balance||!liabilities||!indicators||!concepts) return;
 
-  const inversionesLabel = PORTFOLIO_LIVE?"inversiones a precio actual":"inversiones al último valor guardado";
+  const inversionesLabel = PORTFOLIO_LIVE?("portafolio consolidado en vivo · "+((data.meta&&data.meta.portfolioAt)||"hoy")):"inversiones al último valor guardado";
   const coberturaTxt = s.coberturaMeses===null?"Sin base suficiente":`${s.coberturaMeses.toFixed(1)} meses`;
   const razonEndeudamiento = s.activos>0 ? Math.round(s.pasivos/s.activos*100) : null;
   const pasivosLiquidezRatio = s.liquidez>0 ? Math.round(s.pasivos/s.liquidez*100) : null;
