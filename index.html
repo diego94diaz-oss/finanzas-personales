@@ -111,6 +111,7 @@
   <button data-tab="deudas">Deudas</button>
   <button data-tab="plan">Plan de pago</button>
   <button data-tab="analisis">Análisis</button>
+  <button data-tab="fijos">Gastos fijos</button>
   <button data-tab="respaldo">Respaldo</button>
 </nav>
 
@@ -338,6 +339,32 @@
     <div id="analisis-content"></div>
   </section>
 
+  <!-- GASTOS FIJOS -->
+  <section id="fijos" class="section">
+    <div class="grid cards" id="fijos-cards"></div>
+    <div class="panel">
+      <h2>🏷️ Clasifica tus gastos recurrentes</h2>
+      <p class="small muted">Detecté los gastos que se repiten mes a mes. Clasifícalos:
+        <b>Fijo esencial</b> = no puedes vivir sin él (arriendo, cuentas, cuotas) ·
+        <b>Fijo prescindible</b> = se paga todos los meses pero podrías cortarlo (suscripciones, gustos) ·
+        <b>No es fijo</b> = gasto variable que se coló en la lista. La clasificación se guarda y sincroniza.</p>
+      <div class="flex" style="margin-bottom:10px">
+        <select id="fijos-filtro" onchange="renderFijos()" style="max-width:230px">
+          <option value="">Todos</option>
+          <option value="pendiente">Sin clasificar</option>
+          <option value="esencial">Fijos esenciales</option>
+          <option value="prescindible">Fijos prescindibles</option>
+          <option value="variable">Marcados como no fijos</option>
+        </select>
+      </div>
+      <div id="fijos-list"></div>
+    </div>
+    <div class="panel" id="fijos-resumen-panel">
+      <h2>💡 Lectura de tu costo de vida</h2>
+      <div id="fijos-resumen"></div>
+    </div>
+  </section>
+
   <!-- RESPALDO -->
   <section id="respaldo" class="section">
     <div class="panel">
@@ -402,7 +429,8 @@ let _lastSync = null;     // snapshot para calcular diffs
 function metaPrefs(){
   const m = data.meta || {};
   return { budgets:m.budgets||{}, emergencyGoal:m.emergencyGoal||0, subsOff:m.subsOff||{},
-           recurring:m.recurring||[], catRules:m.catRules||[], createdAt:m.createdAt||new Date().toISOString() };
+           recurring:m.recurring||[], catRules:m.catRules||[], fixedClass:m.fixedClass||{},
+           createdAt:m.createdAt||new Date().toISOString() };
 }
 function setSyncStatus(s){
   const el=document.getElementById("sync-status"); if(!el) return;
@@ -689,7 +717,7 @@ document.getElementById("nav").addEventListener("click",e=>{
 function renderAll(){
   renderDashboard(); renderSalud(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderMesCat();
   renderBudget(); renderPie(); renderComparador(); renderSubs(); renderHormiga();
-  renderRecurring(); renderCatRules(); renderAnalisis(); renderStorageInfo();
+  renderRecurring(); renderCatRules(); renderAnalisis(); renderFijos(); renderStorageInfo();
 }
 
 /* ============ Tema claro/oscuro ============ */
@@ -888,6 +916,109 @@ function renderDashboard(){
   document.getElementById("dash-month").textContent=monthLabel(mk);
   document.getElementById("dash-cats").innerHTML=catBars(mk);
   renderTrend();
+}
+
+/* ============ Gastos fijos (costo fijo de vida) ============ */
+// Agrupa los gastos por descripción normalizada y detecta los que se repiten
+// en 2+ meses distintos -> candidatos a gasto fijo. La clasificación del usuario
+// vive en data.meta.fixedClass = { clave: "esencial" | "prescindible" | "variable" }
+// y se sincroniza vía fin_prefs (metaPrefs).
+function fijoKey(desc){
+  return (desc||"(sin descripción)").toLowerCase()
+    .replace(/^compra\s+/,"").replace(/^transf\.?\s+para\s+/,"").replace(/^tef\s+a\s+/,"")
+    .replace(/\s+/g," ").trim().slice(0,30);
+}
+function gruposGastoRecurrentes(){
+  const grupos={};
+  for(const t of data.transactions){
+    if(t.type!=="gasto") continue;
+    const k=fijoKey(t.desc);
+    const g=(grupos[k]=grupos[k]||{key:k,nombre:t.desc||"(sin descripción)",cat:t.category||"Otros",
+      total:0,n:0,meses:{},last:""});
+    g.total+=t.amount; g.n++;
+    const mk=monthKey(t.date);
+    g.meses[mk]=(g.meses[mk]||0)+t.amount;
+    if((t.date||"")>g.last){ g.last=t.date; g.nombre=t.desc||g.nombre; g.cat=t.category||g.cat; }
+  }
+  const fixedClass=(data.meta&&data.meta.fixedClass)||{};
+  const out=[];
+  for(const k in grupos){
+    const g=grupos[k];
+    const nMeses=Object.keys(g.meses).length;
+    const clasif=fixedClass[k]||null;
+    // candidato si se repite en 2+ meses, o si el usuario ya lo clasificó a mano
+    if(nMeses<2 && !clasif) continue;
+    const sumas=Object.values(g.meses).sort((a,b)=>a-b);
+    const mid=Math.floor(sumas.length/2);
+    const mensual=Math.round(sumas.length%2?sumas[mid]:(sumas[mid-1]+sumas[mid])/2); // mediana mensual
+    out.push({...g, nMeses, mensual, clasif});
+  }
+  out.sort((a,b)=>b.mensual-a.mensual);
+  return out;
+}
+function setFijoClass(key,val){
+  if(!data.meta) data.meta={};
+  if(!data.meta.fixedClass) data.meta.fixedClass={};
+  if(val) data.meta.fixedClass[key]=val; else delete data.meta.fixedClass[key];
+  save(); renderFijos();
+}
+function renderFijos(){
+  const cards=document.getElementById("fijos-cards"); if(!cards) return;
+  const lista=document.getElementById("fijos-list");
+  const resumen=document.getElementById("fijos-resumen");
+  const filtro=(document.getElementById("fijos-filtro")||{}).value||"";
+  const grupos=gruposGastoRecurrentes();
+
+  const esenciales=grupos.filter(g=>g.clasif==="esencial");
+  const prescindibles=grupos.filter(g=>g.clasif==="prescindible");
+  const pendientes=grupos.filter(g=>!g.clasif);
+  const costoFijo=esenciales.reduce((s,g)=>s+g.mensual,0);
+  const recortable=prescindibles.reduce((s,g)=>s+g.mensual,0);
+
+  // sueldo promedio para dimensionar el costo fijo
+  const sueldos=data.transactions.filter(t=>t.type==="ingreso"&&t.category==="Sueldo").map(t=>t.amount);
+  const sueldoProm=sueldos.length?Math.round(sueldos.reduce((a,b)=>a+b,0)/sueldos.length):0;
+  const pctSueldo=sueldoProm?Math.round((costoFijo+recortable)/sueldoProm*100):null;
+
+  cards.innerHTML=`
+    <div class="card"><h3>Costo fijo de vida (esencial)</h3><div class="big neg">${clp(costoFijo)}</div><div class="small muted" style="margin-top:4px">${esenciales.length} ítems /mes</div></div>
+    <div class="card"><h3>Fijos prescindibles</h3><div class="big" style="color:var(--amber)">${clp(recortable)}</div><div class="small muted" style="margin-top:4px">podrías liberar esto /mes</div></div>
+    <div class="card"><h3>Total compromisos fijos</h3><div class="big">${clp(costoFijo+recortable)}</div><div class="small muted" style="margin-top:4px">${pctSueldo!==null?pctSueldo+"% de tu sueldo promedio":"registra tu sueldo para comparar"}</div></div>
+    <div class="card"><h3>Sin clasificar</h3><div class="big ${pendientes.length?"":"pos"}">${pendientes.length}</div><div class="small muted" style="margin-top:4px">${pendientes.length?"gastos recurrentes esperan tu decisión":"¡todo clasificado! 🎉"}</div></div>`;
+
+  let visibles=grupos;
+  if(filtro==="pendiente") visibles=pendientes;
+  else if(filtro) visibles=grupos.filter(g=>g.clasif===filtro);
+  if(!visibles.length){ lista.innerHTML=`<div class="empty">Nada que mostrar con este filtro.</div>`; }
+  else{
+    const btn=(g,val,label,color)=>{
+      const on=g.clasif===val;
+      return `<button onclick="setFijoClass('${g.key.replace(/'/g,"\\'")}','${on?"":val}')"
+        style="border:1px solid ${on?color:"var(--border)"};background:${on?color+"26":"transparent"};color:${on?color:"var(--muted)"};
+        border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">${label}</button>`;
+    };
+    lista.innerHTML=`<table><thead><tr><th>Gasto</th><th>Categoría</th><th style="text-align:right">$/mes (mediana)</th><th style="text-align:right">Meses</th><th>Clasificación</th></tr></thead><tbody>`+
+      visibles.map(g=>`<tr style="${g.clasif==="variable"?"opacity:.45":""}">
+        <td>${g.nombre.slice(0,38)}<div class="small muted">último: ${g.last}</div></td>
+        <td>${catChip(g.cat)}</td>
+        <td style="text-align:right;font-weight:600" class="${g.clasif==="esencial"?"neg":""}">${clp(g.mensual)}</td>
+        <td style="text-align:right" class="muted">${g.nMeses}</td>
+        <td><div class="flex" style="gap:5px;flex-wrap:nowrap">
+          ${btn(g,"esencial","Esencial","#f472b6")}
+          ${btn(g,"prescindible","Prescindible","#fbbf24")}
+          ${btn(g,"variable","No es fijo","#8895a7")}
+        </div></td></tr>`).join("")+`</tbody></table>`;
+  }
+
+  if(resumen){
+    const libre=sueldoProm-costoFijo;
+    let msgs=[];
+    if(costoFijo) msgs.push(`Tu <b>costo fijo de vida</b> es <b>${clp(costoFijo)}</b>/mes: eso necesitas sí o sí para operar. ${sueldoProm?`De tu sueldo promedio (${clp(sueldoProm)}) te quedan <b class="${libre>=0?'pos':'neg'}">${clp(libre)}</b> para gasto variable, deudas extra y ahorro.`:""}`);
+    if(recortable) msgs.push(`Marcaste <b>${clp(recortable)}</b>/mes como prescindible — es tu palanca rápida: cortarlo libera <b>${clp(recortable*12)}</b> al año sin tocar tu calidad de vida esencial.`);
+    if(pendientes.length) msgs.push(`Aún hay <b>${pendientes.length}</b> gastos recurrentes sin clasificar — mientras más completes, más preciso será tu costo de vida.`);
+    if(!costoFijo&&!recortable&&!pendientes.length) msgs.push("Aún no hay gastos recurrentes detectados. A medida que se acumulen meses de historial, aparecerán aquí.");
+    resumen.innerHTML=msgs.map(m=>`<div class="tip">${m}</div>`).join("");
+  }
 }
 
 function renderSalud(){
