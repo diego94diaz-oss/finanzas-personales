@@ -924,8 +924,11 @@ function renderDashboard(){
 // vive en data.meta.fixedClass = { clave: "esencial" | "prescindible" | "variable" }
 // y se sincroniza vía fin_prefs (metaPrefs).
 function fijoKey(desc){
-  return (desc||"(sin descripción)").toLowerCase()
-    .replace(/^compra\s+/,"").replace(/^transf\.?\s+para\s+/,"").replace(/^tef\s+a\s+/,"")
+  const d=(desc||"(sin descripción)").toLowerCase();
+  // el banco varía la glosa de Anthropic entre meses (CLAUDE.AI SUBSCRIPTION,
+  // ANTHROPIC* CLAUDE SUB, etc.) -> se fuerza un grupo único
+  if(d.includes("anthropic")||d.includes("claude")) return "suscripción claude (anthropic)";
+  return d.replace(/^compra\s+/,"").replace(/^transf\.?\s+para\s+/,"").replace(/^tef\s+a\s+/,"")
     .replace(/\s+/g," ").trim().slice(0,30);
 }
 function gruposGastoRecurrentes(){
@@ -946,8 +949,9 @@ function gruposGastoRecurrentes(){
     const g=grupos[k];
     const nMeses=Object.keys(g.meses).length;
     const clasif=fixedClass[k]||null;
-    // candidato si se repite en 2+ meses, o si el usuario ya lo clasificó a mano
-    if(nMeses<2 && !clasif) continue;
+    // candidato si se repite en 2+ meses, si el usuario ya lo clasificó a mano,
+    // o si es una Suscripción (fija por naturaleza, aparece desde el primer mes)
+    if(nMeses<2 && !clasif && g.cat!=="Suscripciones") continue;
     const sumas=Object.values(g.meses).sort((a,b)=>a-b);
     const mid=Math.floor(sumas.length/2);
     const mensual=Math.round(sumas.length%2?sumas[mid]:(sumas[mid-1]+sumas[mid])/2); // mediana mensual
