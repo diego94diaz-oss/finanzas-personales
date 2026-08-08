@@ -468,23 +468,38 @@ async function cloudSync(){
   _lastSync=cur; setSyncStatus("ok");
 }
 
+/* Descarga TODAS las filas de una tabla paginando de a 1000.
+   Supabase/PostgREST corta cada respuesta en 1000 filas y NO avisa: sin esto, al
+   pasar ese total la app perdía movimientos en silencio y los saldos salían mal
+   (pasó el 2026-08-08 al llegar a 1.031 movimientos). */
+const PAGE_SIZE=1000;
+async function fetchAllRows(table,uid){
+  let from=0, out=[];
+  for(;;){
+    const {data:rows,error}=await SB.from(table).select("data").eq("user_id",uid)
+      .range(from,from+PAGE_SIZE-1);
+    if(error) throw error;
+    out=out.concat(rows||[]);
+    if(!rows || rows.length<PAGE_SIZE) break;
+    from+=PAGE_SIZE;
+  }
+  return out;
+}
+
 async function loadFromCloud(){
   const u=(await SB.auth.getUser()).data?.user;
   if(!u) throw new Error("Sesión expirada");
   const [acc,tx,deb,pref]=await Promise.all([
-    SB.from("fin_accounts").select("data").eq("user_id",u.id),
-    SB.from("fin_transactions").select("data").eq("user_id",u.id),
-    SB.from("fin_debts").select("data").eq("user_id",u.id),
+    fetchAllRows("fin_accounts",u.id),
+    fetchAllRows("fin_transactions",u.id),
+    fetchAllRows("fin_debts",u.id),
     SB.from("fin_prefs").select("data").eq("user_id",u.id).maybeSingle(),
   ]);
-  if(acc.error) throw acc.error;
-  if(tx.error) throw tx.error;
-  if(deb.error) throw deb.error;
   if(pref.error) throw pref.error;
   data={
-    accounts:(acc.data||[]).map(r=>r.data),
-    transactions:(tx.data||[]).map(r=>r.data).sort((a,b)=>(a.date||"").localeCompare(b.date||"")),
-    debts:(deb.data||[]).map(r=>r.data),
+    accounts:acc.map(r=>r.data),
+    transactions:tx.map(r=>r.data).sort((a,b)=>(a.date||"").localeCompare(b.date||"")),
+    debts:deb.map(r=>r.data),
     meta:(pref.data&&pref.data.data)||{createdAt:new Date().toISOString()},
   };
   try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){}

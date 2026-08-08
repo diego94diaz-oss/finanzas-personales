@@ -1,7 +1,7 @@
 /* Service worker — Mis Finanzas (versión Supabase).
    Cachea solo el shell de la app (same-origin) para que abra rápido y offline.
    Las llamadas a Supabase y a las fuentes (cross-origin) pasan directo a la red. */
-const CACHE = "finanzas-sb-v5";
+const CACHE = "finanzas-sb-v6";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./datos_cifrados.js"];
 
 self.addEventListener("install", e => {
