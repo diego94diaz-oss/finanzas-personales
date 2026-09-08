@@ -279,6 +279,7 @@
 
   <!-- DEUDAS -->
   <section id="deudas" class="section">
+    <div id="debts-resumen"></div>
     <div class="panel">
       <h2>Agregar deuda</h2>
       <div class="row">
@@ -1473,7 +1474,132 @@ function renderTransactions(){
     `<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Descripción</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+/* ============ Estado general de las deudas (pestaña Deudas) ============
+   Panorama consolidado: cuánto debes, a quién, cuánto pagas al mes y cuándo
+   quedarías libre. Ojo con el doble conteo: las deudas con `incluidoEn` ya
+   están dentro del cupo usado de una tarjeta, por eso no se suman aparte al
+   total (misma regla que usa totalDebt()). */
+function resumenDeudas(){
+  const creditos = data.debts.filter(d => d.tipo === "credito");
+  const activos  = data.debts.filter(d => debtSaldo(d) > 0);
+  const aparte   = data.debts.filter(d => !d.incluidoEn);          // suman al total
+  const enTarjeta= data.debts.filter(d =>  d.incluidoEn && debtSaldo(d) > 0);
+
+  const deudaCreditos = aparte.reduce((s,d) => s + debtSaldo(d), 0);
+  const deudaTarjetas = cardDebt();
+  const total = deudaCreditos + deudaTarjetas;
+
+  // cuota mensual: se pagan TODAS las cuotas activas, incluidas las que van
+  // dentro del cupo de una tarjeta (igual salen de tu bolsillo cada mes)
+  const cuotaMes = creditos.filter(d => debtSaldo(d) > 0)
+                           .reduce((s,d) => s + (d.cuota || 0), 0);
+
+  // avance global sobre lo originalmente solicitado en los créditos
+  const pedido = creditos.reduce((s,d) => s + (d.montoSolicitado || 0), 0);
+  const debe   = creditos.reduce((s,d) => s + debtSaldo(d), 0);
+  const pagado = Math.max(0, pedido - debe);
+  const pctPagado = pedido ? Math.round(pagado / pedido * 100) : 0;
+
+  // meses que faltan = el credito activo que mas tarda en terminar
+  let mesesFaltan = 0;
+  creditos.forEach(d => {
+    if(debtSaldo(d) <= 0) return;
+    const rest = Math.max(0, (d.cuotasTotal || 0) - (d.cuotasPagadas || 0));
+    if(rest > mesesFaltan) mesesFaltan = rest;
+  });
+
+  const interesMes = creditos.filter(d => debtSaldo(d) > 0 && (d.rate || 0) > 0)
+                             .reduce((s,d) => s + Math.round(debtSaldo(d) * d.rate / 100), 0);
+
+  return { creditos, activos, aparte, enTarjeta, deudaCreditos, deudaTarjetas, total,
+           cuotaMes, pedido, debe, pagado, pctPagado, mesesFaltan, interesMes };
+}
+
+function renderDebtsResumen(){
+  const cont = document.getElementById("debts-resumen");
+  if(!cont) return;
+  if(!data.debts.length && !cardDebt()){ cont.innerHTML = ""; return; }
+
+  const r = resumenDeudas();
+  // Ingreso del mes COMPLETO (incluye el sueldo esperado si aún no llega): usar el
+  // acumulado a la fecha daría un porcentaje absurdo los días previos al pago.
+  const proy = proyeccionMes();
+  const ing = proy.proyIngresos;
+  const carga = ing > 0 ? Math.round(r.cuotaMes / ing * 100) : null;
+  const cargaTxt = carga === null ? "comprometida cada mes"
+      : "≈" + carga + "% de tus ingresos del mes" + (proy.sueldoPendiente ? " (sueldo estimado)" : "");
+
+  const filas = r.creditos.slice().sort((a,b) => debtSaldo(b) - debtSaldo(a)).map(d => {
+    const saldo = debtSaldo(d);
+    const rest  = Math.max(0, (d.cuotasTotal || 0) - (d.cuotasPagadas || 0));
+    const pct   = d.cuotasTotal ? Math.round((d.cuotasPagadas || 0) / d.cuotasTotal * 100) : 0;
+    const fin   = saldo > 0 && rest ? mesNombre(rest) : "—";
+    return `<tr${saldo <= 0 ? ' style="opacity:.5"' : ''}>
+      <td><b>${d.name}</b><div class="small muted">${d.creditor || "—"}</div></td>
+      <td style="text-align:right" class="${saldo > 0 ? 'neg' : 'pos'}">${clp(saldo)}</td>
+      <td style="text-align:right">${clp(d.cuota || 0)}</td>
+      <td style="text-align:right">${d.cuotasPagadas || 0}/${d.cuotasTotal || 0}
+        <div class="progress" style="margin-top:4px"><div style="width:${pct}%"></div></div></td>
+      <td style="text-align:right">${(d.rate || 0) > 0 ? d.rate + "% mens." : "sin interés"}</td>
+      <td style="text-align:right">${fin}</td>
+    </tr>`;
+  }).join("");
+
+  const tarjetasHtml = tarjetas().map(a => {
+    const cupo = a.cupo || 0, us = a.utilizado || 0;
+    const pct = cupo ? Math.round(us / cupo * 100) : 0;
+    return `<tr>
+      <td><b>${a.name}</b></td>
+      <td style="text-align:right" class="neg">${clp(us)}</td>
+      <td style="text-align:right" class="pos">${clp(Math.max(0, cupo - us))}</td>
+      <td style="text-align:right">${clp(cupo)}
+        <div class="progress" style="margin-top:4px"><div style="width:${pct}%"></div></div>
+        <div class="small muted">${pct}% usado</div></td>
+    </tr>`;
+  }).join("");
+
+  cont.innerHTML = `<div class="panel">
+    <h2>📊 Estado general de tus deudas</h2>
+    <div class="grid cards" style="margin-top:12px">
+      <div class="card"><h3>Deuda total</h3><div class="big neg">${clp(r.total)}</div>
+        <div class="small muted">créditos + tarjetas</div></div>
+      <div class="card"><h3>Créditos</h3><div class="big">${clp(r.deudaCreditos)}</div>
+        <div class="small muted">${r.aparte.length} que suma${r.aparte.length === 1 ? "" : "n"} aparte</div></div>
+      <div class="card"><h3>Tarjetas de crédito</h3><div class="big">${clp(r.deudaTarjetas)}</div>
+        <div class="small muted">cupo utilizado</div></div>
+      <div class="card"><h3>Cuota mensual</h3><div class="big">${clp(r.cuotaMes)}</div>
+        <div class="small muted">${cargaTxt}</div></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="flex"><b>Avance de tus créditos</b><div class="spacer"></div>
+        <span class="small muted">${clp(r.pagado)} pagados de ${clp(r.pedido)}</span></div>
+      <div class="progress" style="margin-top:6px"><div style="width:${r.pctPagado}%"></div></div>
+      <div class="small muted" style="margin-top:4px">${r.pctPagado}% pagado${
+        r.mesesFaltan ? ` · si mantienes las cuotas actuales, quedarías libre de créditos alrededor de <b>${mesNombre(r.mesesFaltan)}</b> (${r.mesesFaltan} meses)` : ""}${
+        r.interesMes ? ` · pagas ~${clp(r.interesMes)} de interés este mes` : ""}</div>
+    </div>
+
+    ${filas ? `<h3 style="margin-top:20px">Detalle por deuda</h3>
+    <table><thead><tr><th>Deuda</th><th style="text-align:right">Saldo</th>
+      <th style="text-align:right">Cuota</th><th style="text-align:right">Cuotas</th>
+      <th style="text-align:right">Interés</th><th style="text-align:right">Termina</th></tr></thead>
+      <tbody>${filas}</tbody></table>` : ""}
+
+    ${tarjetasHtml ? `<h3 style="margin-top:20px">Tus tarjetas de crédito</h3>
+    <table><thead><tr><th>Tarjeta</th><th style="text-align:right">Utilizado</th>
+      <th style="text-align:right">Disponible</th><th style="text-align:right">Cupo total</th></tr></thead>
+      <tbody>${tarjetasHtml}</tbody></table>` : ""}
+
+    ${r.enTarjeta.length ? `<div class="tip" style="margin-top:14px">ℹ️ ${r.enTarjeta.length} de tus deudas
+      (${r.enTarjeta.map(d => d.name).join(", ")}) ya están dentro del cupo usado de una tarjeta,
+      así que <b>no se suman aparte</b> a la deuda total — si se sumaran, estarías contando esa plata dos veces.
+      Sus cuotas sí están incluidas en la cuota mensual de arriba.</div>` : ""}
+  </div>`;
+}
+
 function renderDebts(){
+  renderDebtsResumen();
   if(!data.debts.length){ document.getElementById("debts-list").innerHTML=`<div class="panel"><div class="empty">No tienes deudas registradas. 🎉</div></div>`; return; }
   document.getElementById("debts-list").innerHTML=data.debts.map(d=>{
     if(d.tipo==="credito") return renderCredito(d);
