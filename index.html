@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mis Finanzas Personales</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="./cartolas.js"></script>
+<script src="./cartolas_ui.js"></script>
 <script>
   // Credenciales Supabase (anon/publishable key: pública por diseño; los datos
   // están protegidos por Row Level Security + login, ver schema.sql).
@@ -108,6 +111,7 @@
   <button data-tab="salud">Salud financiera</button>
   <button data-tab="cuentas">Cuentas</button>
   <button data-tab="movimientos">Movimientos</button>
+  <button data-tab="cartolas">Cartolas</button>
   <button data-tab="deudas">Deudas</button>
   <button data-tab="plan">Plan de pago</button>
   <button data-tab="analisis">Análisis</button>
@@ -278,6 +282,25 @@
   </section>
 
   <!-- DEUDAS -->
+  <!-- CARTOLAS -->
+  <section id="cartolas" class="section">
+    <div class="panel">
+      <h2>📥 Cargar cartolas del banco</h2>
+      <p class="small muted">Arrastra aquí los archivos tal como te los entrega cada banco —sin renombrarlos—.
+        La app reconoce solo de qué producto es cada uno por su contenido, descarta lo que no corresponde
+        (pagos de tarjeta, resúmenes de cuotas), evita duplicados y te muestra qué agregaría
+        <b>antes</b> de tocar nada.</p>
+      <div id="cart-drop" style="border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;cursor:pointer;transition:.15s">
+        <div style="font-size:30px">📄</div>
+        <div style="margin-top:6px"><b>Arrastra los archivos aquí</b> o haz clic para elegirlos</div>
+        <div class="small muted" style="margin-top:4px">Falabella, CMR, BancoEstado, BCI cuenta corriente y BCI Visa · .xls y .xlsx</div>
+        <input type="file" id="cart-files" multiple accept=".xls,.xlsx" style="display:none">
+      </div>
+      <div id="cart-estado" class="small" style="margin-top:12px"></div>
+    </div>
+    <div id="cart-resultado"></div>
+  </section>
+
   <section id="deudas" class="section">
     <div id="debts-resumen"></div>
     <div class="panel">
@@ -731,6 +754,7 @@ document.getElementById("nav").addEventListener("click",e=>{
 
 /* ============ Render ============ */
 function renderAll(){
+  if(typeof initCartolas==='function') initCartolas();
   renderDashboard(); renderSalud(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderMesCat();
   renderBudget(); renderPie(); renderComparador(); renderSubs(); renderHormiga();
   renderRecurring(); renderCatRules(); renderAnalisis(); renderFijos(); renderStorageInfo();
