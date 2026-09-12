@@ -218,6 +218,73 @@ function cartolasAplicar(){
 }
 
 /* ---- cuadrar la app contra el saldo/cupo que reporta el propio banco ---- */
+
+/* Compras cargadas en una tarjeta después de la fecha en que se fijó su cupo.
+   Sirve para estimar el cupo usado de la CMR, cuyo archivo NO trae ese dato. */
+function cartComprasDesde(accId, desde){
+  if(!desde) return null;
+  return data.transactions
+    .filter(t => t.account === accId && t.type === "gasto" && t.date > desde)
+    .reduce((s,t) => s + t.amount, 0);
+}
+
+function cartolasTarjetasHtml(r){
+  // qué tarjeta viene con el cupo dentro del archivo (hoy solo la BCI Visa)
+  const desdeArchivo = {};
+  if(r.metas.bci_visa_nofact && r.metas.bci_visa_nofact.utilizado !== undefined)
+    desdeArchivo["Tarjeta BCI Visa"] = r.metas.bci_visa_nofact;
+
+  const bloques = data.accounts.filter(a => a.card).map(a => {
+    const info = desdeArchivo[a.name];
+    const usado = a.utilizado || 0;
+    const cab = '<tr><td><b>' + escHtml(a.name) + '</b><div class="small muted">cupo total ' +
+                clp(a.cupo || 0) + '</div></td>';
+    // la fecha del dato actual da contexto: si el archivo que subió es más viejo,
+    // actualizar haría RETROCEDER el cupo. Mostrarla siempre para que lo note.
+    const desde = a.cupoAt ? '<div class="small muted">al ' + a.cupoAt + '</div>' : "";
+
+    // 1) el banco lo informa en el archivo: comparar y ofrecer actualizar
+    if(info){
+      if(usado === info.utilizado)
+        return cab + '<td style="text-align:right">' + clp(usado) + desde + '</td>' +
+          '<td style="text-align:right" class="pos">al día ✓</td><td></td></tr>';
+      return cab + '<td style="text-align:right">' + clp(usado) + desde + '</td>' +
+        '<td style="text-align:right"><b>' + clp(info.utilizado) + '</b>' +
+        '<div class="small muted">según tu banco</div></td>' +
+        '<td style="text-align:right"><button class="btn" onclick="cartolasCupo(\'' + a.id +
+        '\',' + info.utilizado + ',' + (info.cupo || 0) + ')">Actualizar</button></td></tr>';
+    }
+
+    // 2) el archivo no lo trae (CMR): estimar y pedir el valor real
+    const nuevas = cartComprasDesde(a.id, a.cupoAt);
+    const est = nuevas === null ? null : usado + nuevas;
+    const estTxt = est === null
+      ? '<div class="small muted">no se puede estimar</div>'
+      : (nuevas > 0
+          ? '<b>' + clp(est) + '</b><div class="small muted">+' + clp(nuevas) +
+            ' en compras desde el ' + a.cupoAt + '</div>'
+          : '<span class="muted">sin compras nuevas desde el ' + a.cupoAt + '</span>');
+    return cab + '<td style="text-align:right">' + clp(usado) + desde + '</td>' +
+      '<td style="text-align:right">' + estTxt + '</td>' +
+      '<td style="text-align:right">' +
+        (est !== null && nuevas > 0
+          ? '<button class="btn ghost" onclick="cartolasCupo(\'' + a.id + '\',' + est + ',0)">Usar estimado</button> '
+          : "") +
+        '<input type="number" id="cart-cupo-' + a.id + '" placeholder="valor real" style="max-width:130px">' +
+        '<button class="btn" onclick="cartolasCupoManual(\'' + a.id + '\')">Guardar</button>' +
+      '</td></tr>';
+  }).join("");
+
+  if(!bloques) return "";
+  return '<div class="panel"><h2>💳 Cupo de tus tarjetas</h2>' +
+    '<p class="small muted">El archivo de la <b>BCI Visa</b> trae el cupo usado, así que se actualiza solo. ' +
+    'El de la <b>Tarjeta CMR</b> no lo trae: la app te muestra cuánto estima sumando tus compras, ' +
+    'pero para dejarlo exacto copia el "cupo utilizado" que aparece en tu banca en línea.</p>' +
+    '<table><thead><tr><th>Tarjeta</th><th style="text-align:right">En la app</th>' +
+    '<th style="text-align:right">Debería ser</th><th></th></tr></thead>' +
+    '<tbody>' + bloques + '</tbody></table></div>';
+}
+
 function cartolasSaldosHtml(r){
   const filas = [];
   [["falabella_cc","Banco Falabella"], ["bci_cc","Banco BCI"], ["bancoestado","BancoEstado"]]
@@ -237,30 +304,24 @@ function cartolasSaldosHtml(r){
         '</td></tr>');
     });
 
-  let tarjeta = "";
-  const visa = r.metas.bci_visa_nofact;
-  if(visa && visa.utilizado !== undefined){
-    const acc = data.accounts.find(a => a.name === "Tarjeta BCI Visa");
-    if(acc && acc.utilizado !== visa.utilizado){
-      tarjeta = '<div class="tip" style="margin-top:12px">💳 Tu Visa marca <b>' + clp(visa.utilizado) +
-        '</b> de cupo usado y en la app tienes ' + clp(acc.utilizado || 0) + '. ' +
-        '<button class="btn ghost" onclick="cartolasCupo(\'' + acc.id + '\',' + visa.utilizado +
-        ',' + (visa.cupo || 0) + ')">Actualizar</button></div>';
-    } else if(acc){
-      tarjeta = '<div class="small muted" style="margin-top:12px">💳 Cupo usado de tu Visa: ' +
-        clp(visa.utilizado) + ' — coincide con la app ✓</div>';
-    }
-  }
-
-  if(!filas.length && !tarjeta) return "";
-  return '<div class="panel"><h2>🔍 Cuadratura con el banco</h2>' +
-    '<p class="small muted">Compara el saldo que calcula la app con el que viene en la cartola. ' +
-    'Si no cuadra, casi siempre es por los pagos de tarjeta: salen de la cuenta pero no se registran ' +
-    'como gasto, para no contar esa deuda dos veces.</p>' +
-    (filas.length ? '<table><thead><tr><th>Cuenta</th><th style="text-align:right">En la app</th>' +
+  const cuentas = filas.length
+    ? '<div class="panel"><h2>🔍 Cuadratura con el banco</h2>' +
+      '<p class="small muted">Compara el saldo que calcula la app con el que viene en la cartola. ' +
+      'Si no cuadra, casi siempre es por los pagos de tarjeta: salen de la cuenta pero no se registran ' +
+      'como gasto, para no contar esa deuda dos veces.</p>' +
+      '<table><thead><tr><th>Cuenta</th><th style="text-align:right">En la app</th>' +
       '<th style="text-align:right">En el banco</th><th style="text-align:right">Diferencia</th><th></th>' +
-      '</tr></thead><tbody>' + filas.join("") + '</tbody></table>' : "") +
-    tarjeta + '</div>';
+      '</tr></thead><tbody>' + filas.join("") + '</tbody></table></div>'
+    : "";
+
+  return cuentas + cartolasTarjetasHtml(r);
+}
+
+function cartolasCupoManual(accId){
+  const inp = document.getElementById("cart-cupo-" + accId);
+  const v = Number(inp && inp.value);
+  if(!v || v < 0){ alert("Escribe el cupo utilizado que muestra tu banco."); return; }
+  cartolasCupo(accId, Math.round(v), 0);
 }
 
 function cartolasCuadrar(accId, real){
@@ -282,6 +343,8 @@ function cartolasCupo(accId, utilizado, cupo){
   if(!acc) return;
   acc.utilizado = utilizado;
   if(cupo) acc.cupo = cupo;
+  // desde qué fecha vale este número: sin esto no se puede estimar después
+  acc.cupoAt = todayStr();
   save(); renderAll();
   if(CART_PENDIENTE) cartolasRenderPreview(CART_PENDIENTE);
 }
