@@ -283,17 +283,57 @@
 
   <!-- DEUDAS -->
   <!-- CARTOLAS -->
+  <!-- CARTOLAS -->
   <section id="cartolas" class="section">
     <div class="panel">
-      <h2>📥 Cargar cartolas del banco</h2>
-      <p class="small muted">Arrastra aquí los archivos tal como te los entrega cada banco —sin renombrarlos—.
-        La app reconoce solo de qué producto es cada uno por su contenido, descarta lo que no corresponde
-        (pagos de tarjeta, resúmenes de cuotas), evita duplicados y te muestra qué agregaría
-        <b>antes</b> de tocar nada.</p>
+      <h2>📥 Actualizar mis finanzas con las cartolas del banco</h2>
+      <p class="small muted">Baja estos 5 archivos de tus bancos y súbelos todos juntos aquí.
+        No hace falta renombrarlos ni ordenarlos: la app reconoce sola cuál es cuál,
+        evita duplicados y te muestra qué va a agregar <b>antes</b> de guardar nada.</p>
+
+      <h3 style="margin-top:18px">Qué bajar de cada banco</h3>
+      <table style="margin-top:8px">
+        <thead><tr><th style="width:26%">Producto</th><th>Dónde bajarlo</th>
+          <th style="width:34%">El archivo llega con este nombre</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>Banco Falabella</b><div class="small muted">Cuenta Corriente</div></td>
+            <td class="small">Banca en línea → Cuenta Corriente → <b>Últimos movimientos</b> → Descargar Excel</td>
+            <td><code>reportCollection.xls</code></td>
+          </tr>
+          <tr>
+            <td><b>Tarjeta CMR</b><div class="small muted">Falabella</div></td>
+            <td class="small">Banca en línea → CMR → <b>Movimientos / Estado de cuenta</b> → Descargar Excel<br>
+              <span class="muted">Cerca del día 9 aparece además el cierre del mes: si te deja bajar los dos, súbelos ambos.</span></td>
+            <td><code>7e6ed01c-58b3-…xlsx</code><div class="small muted">un nombre largo de letras y números</div></td>
+          </tr>
+          <tr>
+            <td><b>BancoEstado</b><div class="small muted">CuentaRUT</div></td>
+            <td class="small">BancoEstado → CuentaRUT → <b>Últimos movimientos</b> → Descargar Excel</td>
+            <td><code>Últimos_Movimientos_CuentaRUT_…xlsx</code></td>
+          </tr>
+          <tr>
+            <td><b>Banco BCI</b><div class="small muted">Cuenta Corriente</div></td>
+            <td class="small">BCI → Cuenta Corriente → <b>Últimos movimientos</b> → Descargar Excel</td>
+            <td><code>movimientos.xlsx</code></td>
+          </tr>
+          <tr>
+            <td><b>Tarjeta BCI Visa</b></td>
+            <td class="small">BCI → Tarjeta de Crédito → <b>Movimientos no facturados</b> → Descargar<br>
+              <span class="muted">Después del día 10 aparece también el facturado del mes: si está, súbelo igual.</span></td>
+            <td><code>MovimientosNoFacturadosNacionales_…xls</code></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="tip" style="margin-top:12px">💡 Súbelos <b>todos juntos de una vez</b>. Si te falta alguno
+        igual funciona: solo se actualizará lo de los bancos que sí subiste, y la app te avisará cuáles faltan.
+        Volver a subir un archivo que ya cargaste <b>no duplica nada</b>.</div>
+
+      <h3 style="margin-top:20px">Súbelos aquí</h3>
       <div id="cart-drop" style="border:2px dashed var(--line);border-radius:14px;padding:26px;text-align:center;cursor:pointer;transition:.15s">
         <div style="font-size:30px">📄</div>
         <div style="margin-top:6px"><b>Arrastra los archivos aquí</b> o haz clic para elegirlos</div>
-        <div class="small muted" style="margin-top:4px">Falabella, CMR, BancoEstado, BCI cuenta corriente y BCI Visa · .xls y .xlsx</div>
+        <div class="small muted" style="margin-top:4px">Puedes seleccionar varios a la vez · .xls y .xlsx</div>
         <input type="file" id="cart-files" multiple accept=".xls,.xlsx" style="display:none">
       </div>
       <div id="cart-estado" class="small" style="margin-top:12px"></div>

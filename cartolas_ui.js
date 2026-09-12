@@ -2,13 +2,19 @@
    Interfaz de la pestaña "Cartolas".
 
    Usa las funciones globales de index.html (data, save, renderAll, clp, uid,
-   escHtml, catOpts, accountBalance) y el pipeline de cartolas.js.
+   escHtml, catsFor, accountBalance) y el pipeline de cartolas.js.
    El flujo siempre es: leer → mostrar vista previa → el usuario aprueba →
    recién ahí se escribe. Nunca se guarda nada sin que él lo vea antes.
    ========================================================================== */
 
 let CART_PENDIENTE = null;
 const CART_CAT_MANUAL = {};
+
+/* catOpts() de index.html es local a otra función, no global: se arma aquí. */
+function cartCatOpts(sel, type){
+  return catsFor(type).map(c =>
+    '<option value="' + c + '"' + (c === sel ? " selected" : "") + '>' + c + '</option>').join("");
+}
 
 const CART_NOMBRE = {
   falabella_cc: "Falabella · Cuenta Corriente",
@@ -62,6 +68,41 @@ async function cartolasProcesar(files){
   cartolasRenderPreview(r);
 }
 
+/* Los 5 productos que deberían venir en una carga completa. El checklist le dice
+   al usuario si bajó todo o le faltó alguno. */
+const CART_ESPERADOS = [
+  {clave:"falabella_cc", nombre:"Banco Falabella · Cuenta Corriente", archivo:"reportCollection.xls"},
+  {clave:"cmr",          nombre:"Tarjeta CMR · Falabella",            archivo:"un nombre largo .xlsx"},
+  {clave:"bancoestado",  nombre:"BancoEstado · CuentaRUT",            archivo:"Últimos_Movimientos_CuentaRUT_….xlsx"},
+  {clave:"bci_cc",       nombre:"Banco BCI · Cuenta Corriente",       archivo:"movimientos.xlsx"},
+  {clave:"bci_visa",     nombre:"Tarjeta BCI Visa",                   archivo:"MovimientosNoFacturadosNacionales_….xls"},
+];
+
+function cartolasChecklistHtml(r){
+  const vistos = new Set(r.leidos.map(x => x.tipo).filter(Boolean)
+    .map(t => t.indexOf("bci_visa") === 0 ? "bci_visa" : t));
+  const filas = CART_ESPERADOS.map(p => {
+    const ok = vistos.has(p.clave);
+    return '<tr><td style="width:34px;font-size:17px">' + (ok ? "✅" : "⬜") + '</td>' +
+      '<td><b>' + p.nombre + '</b></td>' +
+      '<td class="small ' + (ok ? "muted" : "") + '">' +
+      (ok ? "subido ✓" : 'falta — baja <code>' + p.archivo + '</code>') + '</td></tr>';
+  }).join("");
+  const faltan = CART_ESPERADOS.filter(p => !vistos.has(p.clave)).length;
+  const noRec = r.leidos.filter(x => !x.tipo);
+  return '<div class="panel"><h2>✔️ Qué bancos actualizaste</h2>' +
+    '<table><tbody>' + filas + '</tbody></table>' +
+    (faltan
+      ? '<div class="tip" style="margin-top:12px">Te faltan <b>' + faltan + '</b> de 5. ' +
+        'Puedes guardar igual lo que subiste y completar el resto después — no se duplica nada.</div>'
+      : '<div class="small pos" style="margin-top:12px">Subiste los 5 · tus finanzas quedan completas al día ✓</div>') +
+    (noRec.length
+      ? '<div class="tip">❓ No reconocí: ' + noRec.map(x => escHtml(x.fname)).join(", ") +
+        '. Revisa que sea uno de los 5 de la lista de arriba; si es un producto nuevo, avísale a tu asesor.</div>'
+      : "") +
+    '</div>';
+}
+
 function cartolasRenderPreview(r){
   const cont = document.getElementById("cart-resultado");
   const nuevos = r.comp.faltante.slice().sort((a,b) => a.date.localeCompare(b.date));
@@ -81,7 +122,7 @@ function cartolasRenderPreview(r){
     const catCell = tx.type === "transferencia"
       ? '<span class="pill">entre tus cuentas</span>'
       : '<select onchange="cartolasCambiarCat(' + i + ',this.value)">' +
-        catOpts(tx.category, tx.type) + '</select>';
+        cartCatOpts(tx.category, tx.type) + '</select>';
     return '<tr><td>' + tx.date + '</td><td>' + escHtml(tx.desc) + '</td><td>' +
       escHtml(acc ? acc.name : "?") + '</td><td>' + catCell +
       '</td><td style="text-align:right" class="' + cls + '">' + signo + clp(tx.amount) + '</td></tr>';
@@ -109,7 +150,8 @@ function cartolasRenderPreview(r){
       'nuevo, avísale a tu asesor para que la agregue.</div>');
   }
 
-  let html = '<div class="panel"><h2>Archivos leídos</h2>' +
+  let html = cartolasChecklistHtml(r) +
+    '<div class="panel"><h2>Detalle de los archivos</h2>' +
     '<table><thead><tr><th>Archivo</th><th>Reconocido como</th>' +
     '<th style="text-align:right">Contenido</th></tr></thead><tbody>' + archivos + '</tbody></table>' +
     '<div class="grid cards" style="margin-top:14px">' +
@@ -170,7 +212,7 @@ function cartolasAplicar(){
     : "";
   document.getElementById("cart-resultado").innerHTML =
     '<div class="panel"><div class="empty">✓ Listo: ' + n + ' movimiento(s) agregados y sincronizados.</div>' +
-    aviso + '</div>' + cartolasSaldosHtml(guardado);
+    aviso + '</div>' + cartolasChecklistHtml(guardado) + cartolasSaldosHtml(guardado);
   const inp = document.getElementById("cart-files");
   if(inp) inp.value = "";
 }
