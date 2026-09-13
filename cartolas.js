@@ -95,7 +95,8 @@ function esTransfInterna(desc){
 }
 const BCI_SOBREGIRO_INTERNO = new Set([
   "TRANSFER DE D.DIAZ MATAMA","TRANSFER A D.DIAZ MATAMAL","AMORTIZACION LINEA DE SOBREGIRO",
-  "TRASPASO DESDE LINEA SOBREGIRO A CTA CTE","PAGO AUTO SOBREGIRO 20302460",
+  "TRASPASO DESDE LINEA SOBREGIRO A CTA CTE","PAGO AUTO SOBREGIRO 20302460", "Pago Automatico Linea Sobregiro",
+  "Pago Automático Linea Sobregiro",
   "ABONO POR TRF DESDE OTRO BANCO EN LINEA","TRASPASO FONDOS OTRO BANCO EN LINEA",
   "Transferencia desde Linea Sobregiro a Cta. Corrien",
   "Transferencia desde Línea Sobregiro a Cta. Corrien","Amortizacion Linea De Sobregiro",
