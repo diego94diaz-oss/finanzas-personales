@@ -111,12 +111,11 @@
   <button data-tab="salud">Salud financiera</button>
   <button data-tab="cuentas">Cuentas</button>
   <button data-tab="movimientos">Movimientos</button>
-  <button data-tab="cartolas">Cartolas</button>
+  <button data-tab="cartolas">Cartolas y respaldo</button>
   <button data-tab="deudas">Deudas</button>
   <button data-tab="plan">Plan de pago</button>
   <button data-tab="analisis">Análisis</button>
   <button data-tab="fijos">Gastos fijos</button>
-  <button data-tab="respaldo">Respaldo</button>
 </nav>
 
 <main>
@@ -339,6 +338,20 @@
       <div id="cart-estado" class="small" style="margin-top:12px"></div>
     </div>
     <div id="cart-resultado"></div>
+
+    <!-- Respaldo: se fusionó aquí (antes era una pestaña aparte) -->
+    <div class="panel">
+      <h2>Respaldo de tus datos</h2>
+      <p class="small muted">Tus datos se sincronizan con tu cuenta en la nube, así que los ves igual desde cualquier dispositivo. Aun así conviene exportar un respaldo de vez en cuando: es tu copia propia, por si algo sale mal.</p>
+      <div class="flex">
+        <button class="btn" onclick="exportData()">⬇️ Exportar respaldo (.json)</button>
+        <button class="btn ghost" onclick="exportCSV()">📊 Exportar movimientos (.csv)</button>
+        <label class="btn ghost" style="cursor:pointer">⬆️ Importar respaldo<input type="file" accept="application/json" style="display:none" onchange="importData(event)"></label>
+        <div class="spacer"></div>
+        <button class="btn danger" onclick="wipeData()">🗑️ Borrar todos los datos</button>
+      </div>
+      <p class="small muted" id="storage-info" style="margin-top:14px"></p>
+    </div>
   </section>
 
   <section id="deudas" class="section">
@@ -430,20 +443,6 @@
   </section>
 
   <!-- RESPALDO -->
-  <section id="respaldo" class="section">
-    <div class="panel">
-      <h2>Respaldo de tus datos</h2>
-      <p class="small muted">Tus datos viven en este navegador. Para no perderlos (al limpiar el navegador o cambiar de equipo), exporta un archivo de respaldo cada cierto tiempo y guárdalo en un lugar seguro.</p>
-      <div class="flex">
-        <button class="btn" onclick="exportData()">⬇️ Exportar respaldo (.json)</button>
-        <button class="btn ghost" onclick="exportCSV()">📊 Exportar movimientos (.csv)</button>
-        <label class="btn ghost" style="cursor:pointer">⬆️ Importar respaldo<input type="file" accept="application/json" style="display:none" onchange="importData(event)"></label>
-        <div class="spacer"></div>
-        <button class="btn danger" onclick="wipeData()">🗑️ Borrar todos los datos</button>
-      </div>
-      <p class="small muted" id="storage-info" style="margin-top:14px"></p>
-    </div>
-  </section>
 </main>
 
 <!-- Modal: editar movimiento -->
