@@ -310,7 +310,7 @@ function dedup(movs, excl){
   //    contiene ambas fechas, son operaciones reales y no se tocan.
   const porArchivo = new Map();
   out.forEach(m => {
-    const k = [m.origen,m.producto,m.cuenta,m.direction,m.amount,normDesc(m.desc)].join("|");
+    const k = [m.origen,m.producto,m.cuenta,m.direction,m.amount].join("|");
     if(!porArchivo.has(k)) porArchivo.set(k, []);
     porArchivo.get(k).push(m.date);
   });
@@ -321,9 +321,14 @@ function dedup(movs, excl){
       const b = out[j]; if(quitar.has(b)) continue;
       if(a.origen === b.origen) continue;
       if(a.producto!==b.producto||a.cuenta!==b.cuenta||a.direction!==b.direction||a.amount!==b.amount) continue;
-      if(normDesc(a.desc) !== normDesc(b.desc)) continue;
+      // La glosa puede cambiar entre un archivo y otro para la MISMA compra
+      // (2026-09: "COMPRA CUOTAS SIN INTERES VIAJES FALABELLA TC" en el ciclo
+      // cerrado y "COMPRA EN CUOTAS VIAJES FALABELLA TC" en el abierto), asi que
+      // no se exige glosa identica sino parecida. Calibrado con casos reales:
+      // los duplicados dan 0.86-0.93 y gastos distintos del mismo monto 0.26-0.60.
+      if(simil(a.desc, b.desc) < 0.75) continue;
       if(dias(a.date,b.date) !== 1) continue;
-      const kd = [a.producto,a.cuenta,a.direction,a.amount,normDesc(a.desc)].join("|");
+      const kd = [a.producto,a.cuenta,a.direction,a.amount].join("|");
       if((porArchivo.get(a.origen+"|"+kd)||[]).includes(b.date)) continue;
       if((porArchivo.get(b.origen+"|"+kd)||[]).includes(a.date)) continue;
       quitar.add(b);
