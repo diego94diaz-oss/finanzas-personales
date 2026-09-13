@@ -1487,10 +1487,36 @@ function renderHormiga(){
 
 function fillMonthFilter(){
   const sel=document.getElementById("filter-month");
-  const cur=sel.value;
   const months=monthsSpan();
+  // por defecto se muestra solo el mes actual: el historial completo ya pasa los
+  // 1.100 movimientos y abrirlo entero no deja ver lo de ahora
+  const primeraVez=!sel.dataset.init;
+  const cur=primeraVez?monthKey(todayStr()):sel.value;
+  sel.dataset.init="1";
   sel.innerHTML=`<option value="">Todos los meses</option>`+months.map(m=>`<option value="${m}">${monthLabel(m)}</option>`).join("");
-  sel.value=cur;
+  sel.value=months.includes(cur)?cur:"";
+}
+
+/* Pie del historial: deja pasar del mes actual al historial completo y volver. */
+function mvPie(mostrados, total, filtroMes){
+  if(filtroMes){
+    const resto=total-mostrados;
+    if(resto<=0) return "";
+    return `<div class="flex" style="margin-top:14px;justify-content:center">
+      <button class="btn ghost" onclick="mvVerTodos()">Ver todos los movimientos (${resto} más)</button></div>`;
+  }
+  return `<div class="flex" style="margin-top:14px;justify-content:center">
+    <span class="small muted">Mostrando los ${mostrados} movimientos</span>
+    <button class="btn ghost" onclick="mvVerMesActual()">Ver solo el mes actual</button></div>`;
+}
+function mvVerTodos(){
+  document.getElementById("filter-month").value="";
+  renderTransactions();
+}
+function mvVerMesActual(){
+  const sel=document.getElementById("filter-month");
+  sel.value=monthKey(todayStr());
+  renderTransactions();
 }
 
 function fillCategoryFilter(){
@@ -1513,7 +1539,17 @@ function renderTransactions(){
   if(fm) list=list.filter(t=>monthKey(t.date)===fm);
   if(fc) list=list.filter(t=>t.category===fc);
   if(fx) list=list.filter(t=>((t.desc||"")+" "+accName(t.account)).toLowerCase().includes(fx));
-  if(!list.length){ document.getElementById("mv-list").innerHTML=`<div class="empty">Sin movimientos para este filtro.</div>`; return; }
+  // total sin el filtro de mes: sirve para saber cuántos quedan fuera
+  let totalSinMes=[...data.transactions];
+  if(ft) totalSinMes=totalSinMes.filter(t=>t.type===ft);
+  if(fc) totalSinMes=totalSinMes.filter(t=>t.category===fc);
+  if(fx) totalSinMes=totalSinMes.filter(t=>((t.desc||"")+" "+accName(t.account)).toLowerCase().includes(fx));
+  if(!list.length){
+    document.getElementById("mv-list").innerHTML=
+      `<div class="empty">Sin movimientos ${fm?"en "+monthLabel(fm):"para este filtro"}.</div>`
+      +mvPie(0,totalSinMes.length,fm);
+    return;
+  }
   const rows=list.map(t=>{
     let detalle, montoCls, signo;
     if(t.type==="ingreso"){ detalle=accName(t.account); montoCls="pos"; signo="+"; }
@@ -1534,7 +1570,8 @@ function renderTransactions(){
     </tr>`;
   }).join("");
   document.getElementById("mv-list").innerHTML=
-    `<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Descripción</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    `<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Descripción</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+    +mvPie(list.length,totalSinMes.length,fm);
 }
 
 /* ============ Estado general de las deudas (pestaña Deudas) ============
