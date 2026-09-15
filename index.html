@@ -72,6 +72,10 @@
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9998;padding:18px;backdrop-filter:blur(4px)}
   .modal-card{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:26px;width:480px;max-width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
   .modal-card h2{margin:0 0 16px;font-size:20px;font-weight:700}
+  /* Pestaña Inversiones (conexión con «Mis Inversiones») */
+  .inv-shell{display:grid;gap:18px}
+  .inv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
+  .inv-shell table td,.inv-shell table th{padding:8px 10px}
 </style>
 </head>
 <body>
@@ -100,6 +104,7 @@
   </div>
   <div class="spacer"></div>
   <div class="top-actions">
+    <button class="btn ghost" id="inv-link" onclick="irAInversiones(this)" title="Ir a Mis Inversiones (sin volver a iniciar sesión)" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap">📈 Inversiones</button>
     <span id="sync-status" class="small muted"></span>
     <button id="theme-toggle" class="btn ghost" style="width:36px;height:36px;border-radius:11px;padding:0" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
     <button class="btn ghost" style="width:36px;height:36px;border-radius:50%;padding:0" onclick="logout()" title="Cerrar sesión">⎋</button>
@@ -109,6 +114,7 @@
 <nav id="nav">
   <button data-tab="dashboard" class="active">Resumen</button>
   <button data-tab="salud">Salud financiera</button>
+  <button data-tab="inversiones">Inversiones</button>
   <button data-tab="cuentas">Cuentas</button>
   <button data-tab="movimientos">Movimientos</button>
   <button data-tab="deudas">Deudas</button>
@@ -170,6 +176,11 @@
       <div class="grid cards" id="dash-cards" style="display:none"></div>
       <div id="dash-proyeccion" style="display:none"></div>
     </div>
+  </section>
+
+  <!-- INVERSIONES (conexión con «Mis Inversiones») -->
+  <section id="inversiones" class="section">
+    <div class="inv-shell" id="inv-root"><div class="panel"><p class="muted">Cargando tus inversiones…</p></div></div>
   </section>
 
   <!-- SALUD FINANCIERA -->
@@ -493,6 +504,7 @@ function metaPrefs(){
   const m = data.meta || {};
   return { budgets:m.budgets||{}, emergencyGoal:m.emergencyGoal||0, subsOff:m.subsOff||{},
            recurring:m.recurring||[], catRules:m.catRules||[], fixedClass:m.fixedClass||{},
+           resumen:m.resumen||null,
            createdAt:m.createdAt||new Date().toISOString() };
 }
 function setSyncStatus(s){
@@ -597,6 +609,16 @@ async function boot(){
   applyTheme(localStorage.getItem("finanzas_theme")||"dark");
   if(!(window.supabase&&window.FIN_CONFIG&&window.FIN_CONFIG.SUPABASE_URL)){ alert("No se pudo cargar Supabase."); return; }
   SB=window.supabase.createClient(window.FIN_CONFIG.SUPABASE_URL, window.FIN_CONFIG.SUPABASE_ANON_KEY);
+  // Llegada desde «Mis Inversiones» con #sso=<código>: se canjea por una sesión
+  // PROPIA de esta app (no se comparte la de la otra) y se borra de la URL.
+  const sso=location.hash.match(/^#sso=([^&]+)/);
+  if(sso){
+    history.replaceState(null,"",location.pathname+location.search);
+    const token_hash=decodeURIComponent(sso[1]);
+    let {error}=await SB.auth.verifyOtp({token_hash,type:"magiclink"});
+    if(error) ({error}=await SB.auth.verifyOtp({token_hash,type:"email"}));
+    if(error) console.warn("No se pudo entrar con el código de Inversiones:",error.message);
+  }
   const {data:sess}=await SB.auth.getSession();
   if(sess?.session?.user) await enterApp();
   else document.getElementById("auth-overlay").style.display="flex";
@@ -671,15 +693,15 @@ function cardDebt(){ return tarjetas().reduce((s,a)=>s+(a.utilizado||0),0); }
 function debtOnlyTotal(){ return data.debts.filter(d=>!d.incluidoEn).reduce((s,d)=>s+debtSaldo(d),0); }
 function inversionesActuales(){ const inv=portfolioValue(); return inv!==null?inv:inversionesTotal(); }
 function cashFlowForMonth(mk){
-  const ingresos=sumByType("ingreso",mk), gastos=sumByType("gasto",mk);
-  return { ingresos, gastos, neto:ingresos-gastos };
+  const ingresos=sumByType("ingreso",mk), gastos=sumByType("gasto",mk), invertido=sumInvertido(mk);
+  return { ingresos, gastos, invertido, neto:ingresos-gastos-invertido };
 }
 function clampPct(n){ return Math.max(0, Math.min(100, Math.round(n||0))); }
 
 /* Gasto "variable" del mes = gasto total menos cuotas de deudas (esas son fijas y
    suelen pagarse a inicio de mes, distorsionando cualquier promedio simple diario). */
 function gastoVariableMes(mk){
-  return data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk&&t.category!=="Deudas y cuotas")
+  return data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk&&t.category!=="Deudas y cuotas")
     .reduce((s,t)=>s+t.amount,0);
 }
 function diasDelMes(mk){ const [y,m]=mk.split("-").map(Number); return new Date(y,m,0).getDate(); }
@@ -711,6 +733,7 @@ function proyeccionMes(){
 
   const pagosPendientes=pendingDebtPaymentsMonth(mk);
   const proyGastos=Math.round(gastadoHoy+variableRestante+pagosPendientes);
+  const invertidoMes=sumInvertido(mk);
 
   // Sueldo esperado: si este mes aún no se registra un ingreso "Sueldo", se proyecta
   // el promedio (monto y día) de los últimos sueldos registrados. Bonos/horas extra no
@@ -732,7 +755,7 @@ function proyeccionMes(){
   return { mk, dia, diasMes, diasRestantes, gastadoHoy, ingresadoHoy, tasaVarDiaria,
     variableRestante, promVariablePrev, variableProyectado, pagosPendientes, proyGastos,
     sueldoPendiente, montoSueldoEsperado, diaSueldoEsperado, proyIngresos,
-    flujoProy: proyIngresos-proyGastos, cierreCaja };
+    invertidoMes, flujoProy: proyIngresos-proyGastos-invertidoMes, cierreCaja };
 }
 
 function healthTone(s){
@@ -752,7 +775,8 @@ function financialSnapshot(){
   const activos=liquidez+inversiones;
   const patrimonio=activos-pasivos;
   const flow=cashFlowForMonth(mk);
-  const tasaAhorro=flow.ingresos>0?Math.round(flow.neto/flow.ingresos*100):0;
+  // Ahorro = lo que no se consumió: incluye lo enviado a inversiones.
+  const tasaAhorro=flow.ingresos>0?Math.round((flow.ingresos-flow.gastos)/flow.ingresos*100):0;
   const prev=monthsSpan().filter(m=>m<mk).slice(0,3);
   const gastoBase=prev.length?Math.round(prev.reduce((s,m)=>s+sumByType("gasto",m),0)/prev.length):flow.gastos;
   const coberturaMeses=gastoBase>0?liquidez/gastoBase:null;
@@ -779,7 +803,15 @@ function monthsSpan(){
   return [...keys].sort().reverse();
 }
 function sumByType(type,mk){
-  return data.transactions.filter(t=>t.type===type && (!mk||monthKey(t.date)===mk)).reduce((s,t)=>s+t.amount,0);
+  // Los "gastos" con categoría Inversiones (transferencias a Zesty/Racional) NO son
+  // consumo: son ahorro que se mueve a la app «Mis Inversiones». Se excluyen de
+  // todo total de gasto; lo invertido se suma aparte con sumInvertido().
+  return data.transactions.filter(t=>t.type===type && (type!=="gasto"||esGastoReal(t)) && (!mk||monthKey(t.date)===mk)).reduce((s,t)=>s+t.amount,0);
+}
+function esInversion(t){ return t.type==="gasto" && t.category==="Inversiones"; }
+function esGastoReal(t){ return t.type==="gasto" && t.category!=="Inversiones"; }
+function sumInvertido(mk){
+  return data.transactions.filter(t=>esInversion(t) && (!mk||monthKey(t.date)===mk)).reduce((s,t)=>s+t.amount,0);
 }
 
 /* ============ Navegación ============ */
@@ -797,6 +829,7 @@ function renderAll(){
   renderDashboard(); renderSalud(); renderAccounts(); renderTransactions(); renderDebts(); renderPlan(); renderMesCat();
   renderBudget(); renderPie(); renderComparador(); renderSubs(); renderHormiga();
   renderRecurring(); renderCatRules(); renderAnalisis(); renderFijos(); renderStorageInfo();
+  renderInversiones(); publicarResumen();
 }
 
 /* ============ Tema claro/oscuro ============ */
@@ -897,7 +930,7 @@ function renderMesCat(){
   const mk=sel.value;
   const cont=document.getElementById("an-mescat");
   const totals={}, byCat={};
-  data.transactions.filter(t=>t.type==="gasto" && monthKey(t.date)===mk).forEach(t=>{
+  data.transactions.filter(t=>esGastoReal(t) && monthKey(t.date)===mk).forEach(t=>{
     const c=t.category||"Otros";
     totals[c]=(totals[c]||0)+t.amount;
     (byCat[c]=byCat[c]||[]).push(t);
@@ -906,7 +939,7 @@ function renderMesCat(){
   if(!entries.length){ cont.innerHTML=`<div class="empty">Sin gastos en ${monthLabel(mk)}.</div>`; return; }
   const tot=entries.reduce((s,e)=>s+e[1],0), max=Math.max(...entries.map(e=>e[1]));
   const prevMk=prevMonthKey(mk); const prevTotals={};
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===prevMk)
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===prevMk)
     .forEach(t=>{const c=t.category||"Otros"; prevTotals[c]=(prevTotals[c]||0)+t.amount;});
   const hayPrev=Object.keys(prevTotals).length>0;
   cont.innerHTML=`<div class="small muted" style="margin-bottom:12px">Total gastos de <b>${monthLabel(mk)}</b>: <b style="color:var(--text)">${clp(tot)}</b>${hayPrev?` · ▲/▼ vs ${monthLabel(prevMk)}`:""} · toca una categoría para ver el detalle</div>`+
@@ -951,6 +984,7 @@ async function fetchPortfolio(){
       Authorization:"Bearer "+sess.access_token }});
     if(!r.ok) return;
     const snap=await r.json();
+    INV_SNAP=snap; INV_ERROR=null;
     const cons=snap&&snap.endpoints&&snap.endpoints["/api/summary|currency=CLP"];
     const clpTotal=cons?Number(cons.total_value):0;
     if(clpTotal>0){
@@ -960,13 +994,197 @@ async function fetchPortfolio(){
       renderDashboard();
       if(typeof renderSalud==="function") renderSalud();
     }
-  }catch(e){ /* sin conexión / snapshot no disponible: se usa el último valor guardado */ }
+    renderInversiones();
+  }catch(e){ INV_ERROR=String(e&&e.message||e); renderInversiones(); /* sin conexión: último valor guardado */ }
+}
+
+/* ============ Conexión con «Mis Inversiones» ============
+   Lee el snapshot que publica esa app (INV_SNAP, bajado en fetchPortfolio) y:
+   - muestra el detalle del portafolio (por portafolio, cuenta, posiciones, dividendos);
+   - cuadra cada transferencia de categoría Inversiones contra el depósito que
+     registró la app de inversiones (mismo monto en CLP, o USD a un tipo de cambio
+     razonable, ±4 días, cuenta según la glosa: "z app"→Zesty, "vector"→Racional);
+   - publica en fin_prefs un resumen (líquido y deudas) que esa app usa para el
+     patrimonio neto. Nada más sale de Finanzas: ni movimientos ni glosas. */
+const INV_APP_URL="https://mis-inversiones.github.io/";
+let INV_SNAP=null, INV_ERROR=null;
+function invEp(k){ return INV_SNAP&&INV_SNAP.endpoints?INV_SNAP.endpoints[k]:null; }
+function pctTxt(v){ if(v===null||v===undefined||isNaN(v)) return "—"; return (v>0?"+":"")+Number(v).toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2})+"%"; }
+function sgn(v){ return v>0?"pos":(v<0?"neg":""); }
+function usdTxt(n){ return "US$"+Number(n||0).toLocaleString("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function cuadreAportes(){
+  const fin=data.transactions.filter(esInversion).slice().sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  if(!INV_SNAP) return { filas:fin.map(t=>({fin:t,inv:[]})), extra:[], desde:null };
+  // Desde el primer mes con registro COMPLETO (≥50 movimientos): las cartolas de
+  // tarjeta traen algunas compras sueltas más antiguas que no son el inicio real.
+  const porMes={}; data.transactions.forEach(t=>{ const m=monthKey(t.date); if(m) porMes[m]=(porMes[m]||0)+1; });
+  const mesInicio=Object.keys(porMes).sort().find(m=>porMes[m]>=50);
+  const desde=mesInicio?mesInicio+"-01":"2000-01-01";
+  const deps=(INV_SNAP.transactions_all||[])
+    .filter(t=>t.type==="DEPOSIT" && (t.date||"").slice(0,10)>=desde && !/Neutraliza/i.test(t.asset_name||""))
+    .map(t=>({...t,d:(t.date||"").slice(0,10),usado:false}))
+    .sort((a,b)=>a.d.localeCompare(b.d));
+  const dias=(a,b)=>Math.abs((new Date(a)-new Date(b))/86400000);
+  const destino=desc=>/z app|zesty/i.test(desc)?"Zesty":(/vector|racional/i.test(desc)?"Racional":null);
+  const filas=fin.map(t=>{
+    const dest=destino(t.desc||"");
+    const ventana=deps.filter(d=>!d.usado && dias(d.d,t.date)<=4 && (!dest||d.account===dest));
+    // 1) un depósito del mismo monto (CLP exacto ±0,5%, o USD a 700–1.200 CLP por dólar)
+    const uno=ventana.filter(d=>d.currency==="CLP"?Math.abs(d.amount-t.amount)<=Math.max(1,t.amount*0.005)
+                                   :(d.currency==="USD"&&d.amount>0&&t.amount/d.amount>700&&t.amount/d.amount<1200))
+                     .sort((a,b)=>dias(a.d,t.date)-dias(b.d,t.date))[0];
+    if(uno){ uno.usado=true; return {fin:t,inv:[uno]}; }
+    // 2) varios depósitos en CLP de la misma cuenta que suman la transferencia (Zesty a veces la parte)
+    const clp_=ventana.filter(d=>d.currency==="CLP");
+    for(let i=0;i<clp_.length;i++){ let suma=0;
+      for(let j=i;j<clp_.length&&j<i+5;j++){ suma+=clp_[j].amount;
+        if(clp_.slice(i,j+1).every(d=>d.account===clp_[i].account) && Math.abs(suma-t.amount)<=Math.max(1,t.amount*0.005)){
+          const grupo=clp_.slice(i,j+1); grupo.forEach(d=>d.usado=true); return {fin:t,inv:grupo}; } } }
+    return {fin:t,inv:[]};
+  });
+  // Depósitos sin transferencia: agrupados por cuenta y día (Zesty parte algunos aportes en varios).
+  const grupos={};
+  deps.filter(d=>!d.usado).forEach(d=>{ const k=d.account+"|"+d.d+"|"+d.currency;
+    (grupos[k]=grupos[k]||{account:d.account,d:d.d,currency:d.currency,amount:0,n:0}); grupos[k].amount+=d.amount; grupos[k].n++; });
+  return { filas, extra:Object.values(grupos).sort((a,b)=>a.d.localeCompare(b.d)), desde };
+}
+
+function renderInversiones(){
+  const root=document.getElementById("inv-root"); if(!root) return;
+  if(!INV_SNAP){
+    root.innerHTML=`<div class="panel"><h2>Tus inversiones</h2><p class="muted">${INV_ERROR?"No se pudieron cargar los datos de «Mis Inversiones» ("+escHtml(INV_ERROR)+").":"Cargando los datos de «Mis Inversiones»…"}</p>
+      <button class="btn" onclick="irAInversiones(this)">📈 Abrir Mis Inversiones</button></div>`;
+    return;
+  }
+  const S=k=>invEp("/api/summary|"+k)||{};
+  const cons=S("currency=CLP"), eeuu=S("currency=CLP|portfolio=EEUU"), chile=S("currency=CLP|portfolio=Chile");
+  const fx=cons.fx_rate||((invEp("/api/fx")||{}).rate)||950;
+  const gen=INV_SNAP.generated_at?new Date(INV_SNAP.generated_at).toLocaleString("es-CL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):"—";
+  const mk=monthKey(todayStr());
+  const invMes=sumInvertido(mk);
+  const meses12=monthsSpan().filter(m=>m<=mk).slice(0,12);
+  const inv12=meses12.reduce((s,m)=>s+sumInvertido(m),0), ing12=meses12.reduce((s,m)=>s+sumByType("ingreso",m),0);
+
+  // por cuenta
+  const cuentas=(invEp("/api/accounts")||[]).map(a=>({name:a.name,portfolio:a.portfolio,s:S("account="+a.name+"|currency=CLP")}))
+    .filter(c=>(c.s.total_value||0)>1).sort((a,b)=>b.s.total_value-a.s.total_value);
+  const filasCuentas=cuentas.map(c=>`<tr><td><b>${escHtml(c.name)}</b> <span class="small muted">${c.portfolio}</span></td>
+    <td class="num" style="text-align:right">${clp(c.s.total_value)}</td>
+    <td class="num ${sgn(c.s.day_change)}" style="text-align:right">${clp(c.s.day_change)} <span class="small">${pctTxt(c.s.day_change_pct)}</span></td>
+    <td class="num ${sgn(c.s.twr_total_pct)}" style="text-align:right">${pctTxt(c.s.twr_total_pct)}</td></tr>`).join("");
+
+  // principales posiciones (valor en USD en el snapshot → CLP al dólar de hoy)
+  const pos=(invEp("/api/positions|consolidated=1")||[]).filter(p=>Math.abs(p.qty)>1e-6).sort((a,b)=>b.value-a.value).slice(0,8);
+  const filasPos=pos.map(p=>`<tr><td><b>${escHtml(p.ticker)}</b> <span class="small muted">${escHtml((p.name||"").slice(0,26))}</span></td>
+    <td class="num" style="text-align:right">${clp(p.value*fx)}</td>
+    <td class="num" style="text-align:right">${(p.weight_pct||0).toLocaleString("es-CL",{maximumFractionDigits:1})}%</td>
+    <td class="num ${sgn(p.return_pct)}" style="text-align:right">${pctTxt(p.return_pct)}</td></tr>`).join("");
+
+  // dividendos
+  const divs=((invEp("/api/dividends")||{}).dividends)||[];
+  const hace12=new Date(); hace12.setFullYear(hace12.getFullYear()-1); const d12=dateKey(hace12);
+  const anio=todayStr().slice(0,4);
+  const div12=divs.filter(d=>d.date>=d12).reduce((s,d)=>s+(d.amount_usd||0),0)*fx;
+  const divAnio=divs.filter(d=>d.date.slice(0,4)===anio).reduce((s,d)=>s+(d.amount_usd||0),0)*fx;
+
+  // cuadre
+  const q=cuadreAportes();
+  const ok=q.filas.filter(f=>f.inv.length).length;
+  const filasCuadre=q.filas.slice().reverse().map(f=>{
+    const inv=f.inv;
+    const invTxt=inv.length?inv.map(d=>`${escHtml(d.account)} · ${d.d} · ${d.currency==="USD"?usdTxt(d.amount):clp(d.amount)}`).join("<br>"):"—";
+    const estado=inv.length?`<span class="pill" style="background:#16a34a1f;color:#16a34a">✓ cuadra</span>`
+                           :`<span class="pill" style="background:#e0252b1f;color:#e0252b">sin depósito en Inversiones</span>`;
+    return `<tr><td>${f.fin.date}</td><td>${escHtml(accName(f.fin.account))}<br><span class="small muted">${escHtml(f.fin.desc||"")}</span></td>
+      <td class="num" style="text-align:right">${clp(f.fin.amount)}</td><td class="small">${invTxt}</td><td>${estado}</td></tr>`;}).join("");
+  const filasExtra=q.extra.slice().reverse().map(d=>`<tr><td>${d.d}</td><td>${escHtml(d.account)}${d.n>1?` <span class="small muted">(${d.n} depósitos)</span>`:""}</td>
+    <td class="num" style="text-align:right">${d.currency==="USD"?usdTxt(d.amount)+` <span class="small muted">≈ ${clp(d.amount*fx)}</span>`:clp(d.amount)}</td></tr>`).join("");
+
+  root.innerHTML=`
+    <div class="hero-row">
+      <div class="hero-card">
+        <div class="kicker">Tus inversiones</div>
+        <div class="hero-value">${clp(cons.total_value)}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="chip">${(cons.day_change||0)>=0?"▲":"▼"} ${clp(Math.abs(cons.day_change||0))} · ${pctTxt(cons.day_change_pct)}</span><span style="font-size:12.5px;color:var(--soft)">hoy · datos del ${gen}</span></div>
+        <div class="mini-grid"><div class="mini-box"><small>EEUU</small><b>${clp(eeuu.total_value)}</b></div><div class="mini-box"><small>Chile</small><b>${clp(chile.total_value)}</b></div></div>
+      </div>
+      <div class="panel metric-card">
+        <div><div class="kicker">Rentabilidad</div>
+          <div class="metric-value ${sgn(cons.twr_total_pct)}">${pctTxt(cons.twr_total_pct)}</div>
+          <div class="small muted" style="margin-top:8px">total desde el inicio (TWR)</div></div>
+        <div class="stat-grid">
+          <div class="stat-box"><small>Este año</small><b class="${sgn(cons.twr_year_pct)}">${pctTxt(cons.twr_year_pct)}</b></div>
+          <div class="stat-box"><small>Este mes</small><b class="${sgn(cons.twr_month_pct)}">${pctTxt(cons.twr_month_pct)}</b></div>
+          <div class="stat-box"><small>Ganancia total</small><b class="${sgn(cons.gain)}">${clp(cons.gain)}</b></div>
+          <div class="stat-box"><small>Dólar</small><b>${clp(fx)}</b></div>
+        </div>
+      </div>
+      <div class="panel metric-card">
+        <div><div class="kicker">Lo que envías a invertir</div>
+          <div class="metric-value">${clp(invMes)}</div>
+          <div class="small muted" style="margin-top:8px">este mes · no cuenta como gasto</div></div>
+        <div class="stat-grid">
+          <div class="stat-box"><small>Últimos 12 meses</small><b>${clp(inv12)}</b></div>
+          <div class="stat-box"><small>% de tus ingresos</small><b>${ing12>0?Math.round(inv12/ing12*100)+"%":"—"}</b></div>
+          <div class="stat-box"><small>Dividendos 12 m</small><b class="pos">${clp(div12)}</b></div>
+          <div class="stat-box"><small>Dividendos ${anio}</small><b class="pos">${clp(divAnio)}</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="inv-grid">
+      <div class="panel"><h2>Por cuenta</h2>
+        <table><thead><tr><th>Cuenta</th><th style="text-align:right">Valor</th><th style="text-align:right">Hoy</th><th style="text-align:right">Rentab.</th></tr></thead><tbody>${filasCuentas}</tbody></table></div>
+      <div class="panel"><h2>Principales posiciones</h2>
+        <table><thead><tr><th>Activo</th><th style="text-align:right">Valor</th><th style="text-align:right">Peso</th><th style="text-align:right">Retorno</th></tr></thead><tbody>${filasPos}</tbody></table></div>
+    </div>
+    <div class="panel">
+      <div class="flex" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <h2 style="margin:0">Cuadre de aportes</h2>
+        <span class="small muted">${ok} de ${q.filas.length} transferencias cuadran con un depósito en Inversiones</span>
+      </div>
+      <p class="small muted">Cada transferencia con categoría <b>Inversiones</b> se busca en «Mis Inversiones»: mismo monto (o su equivalente en dólares), hasta 4 días de diferencia.</p>
+      ${q.filas.length?`<div style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th>Desde (Finanzas)</th><th style="text-align:right">Monto</th><th>Depósito en Inversiones</th><th>Estado</th></tr></thead><tbody>${filasCuadre}</tbody></table></div>`:`<p class="muted">Aún no tienes transferencias con categoría Inversiones.</p>`}
+      ${q.extra.length?`<h3 style="margin-top:18px">Aportes que no pasaron por tus cuentas de Finanzas</h3>
+        <p class="small muted">Depósitos que registra «Mis Inversiones» desde ${q.desde} sin una transferencia en Finanzas: salieron de una cuenta que no tienes registrada acá.</p>
+        <div style="overflow-x:auto"><table><thead><tr><th>Fecha</th><th>Cuenta</th><th style="text-align:right">Monto</th></tr></thead><tbody>${filasExtra}</tbody></table></div>`:""}
+    </div>
+    <div style="text-align:center;margin:8px 0 24px"><button class="btn" onclick="irAInversiones(this)">📈 Abrir Mis Inversiones</button></div>`;
+}
+
+// Resumen para «Mis Inversiones» (patrimonio neto). Solo tras cargar desde la
+// nube (_lastSync): con la caché local podría publicar datos viejos.
+function publicarResumen(){
+  if(!data.meta || !_lastSync) return;
+  const mk=monthKey(todayStr());
+  const r={ liquido:Math.round(totalBalance()), deudas:Math.round(debtOnlyTotal()), tarjetas:Math.round(cardDebt()),
+            deuda_total:Math.round(totalDebt()), invertido_mes:Math.round(sumInvertido(mk)),
+            gastos_mes:Math.round(sumByType("gasto",mk)), ingresos_mes:Math.round(sumByType("ingreso",mk)) };
+  const prev=data.meta.resumen||{};
+  if(prev.fecha===todayStr() && Object.keys(r).every(k=>prev[k]===r[k])) return;
+  data.meta.resumen={...r, fecha:todayStr()};
+  save();
+}
+
+// Salto a «Mis Inversiones» con sesión: la edge function portafolio-sso entrega
+// una URL con un código de un solo uso. Si falla, se abre la app normal (con login).
+async function irAInversiones(btn){
+  if(btn){ btn.disabled=true; }
+  try{
+    const {data:{session}}=await SB.auth.getSession();
+    const r=await fetch(window.FIN_CONFIG.SUPABASE_URL+"/functions/v1/portafolio-sso",{method:"POST",
+      headers:{Authorization:"Bearer "+session.access_token, apikey:window.FIN_CONFIG.SUPABASE_ANON_KEY, "Content-Type":"application/json"},
+      body:JSON.stringify({destino:"inversiones"})});
+    const out=await r.json();
+    if(!r.ok||!out.url) throw new Error(out.error||r.status);
+    location.href=out.url;
+  }catch(e){ location.href=INV_APP_URL; }
 }
 
 function renderDashboard(){
   const mk=monthKey(todayStr());
-  const ingMes=sumByType("ingreso",mk), gasMes=sumByType("gasto",mk);
-  const ahorro=ingMes-gasMes;
+  const ingMes=sumByType("ingreso",mk), gasMes=sumByType("gasto",mk), invMes=sumInvertido(mk);
+  const ahorro=ingMes-gasMes-invMes;
   const inv=portfolioValue();
   const liquido=totalBalance();
   const deuda=totalDebt();
@@ -977,7 +1195,7 @@ function renderDashboard(){
   if(hero) hero.innerHTML=`
     <div class="kicker">Disponible hoy</div>
     <div class="hero-value">${clp(liquido)}</div>
-    <div style="display:flex;align-items:center;gap:8px"><span class="chip">${ahorro>=0?'▲':'▼'} ${clp(Math.abs(ahorro))}</span><span style="font-size:12.5px;color:var(--soft)">balance del mes</span></div>
+    <div style="display:flex;align-items:center;gap:8px"><span class="chip">${ahorro>=0?'▲':'▼'} ${clp(Math.abs(ahorro))}</span><span style="font-size:12.5px;color:var(--soft)">balance del mes</span>${invMes>0?`<span class="chip" style="cursor:pointer" onclick="document.querySelector('#nav button[data-tab=inversiones]').click()" title="Enviado a tus inversiones este mes (no cuenta como gasto)">📈 ${clp(invMes)} invertido</span>`:""}</div>
     <div class="mini-grid"><div class="mini-box"><small>Cuentas</small><b>${clp(cuentas)}</b></div><div class="mini-box"><small>Efectivo</small><b>${clp(efectivo)}</b></div></div>`;
   const debtCard=document.getElementById("dash-deuda-card");
   if(debtCard) debtCard.innerHTML=`
@@ -1013,7 +1231,7 @@ function fijoKey(desc){
 function gruposGastoRecurrentes(){
   const grupos={};
   for(const t of data.transactions){
-    if(t.type!=="gasto") continue;
+    if(!esGastoReal(t)) continue;
     const k=fijoKey(t.desc);
     const g=(grupos[k]=grupos[k]||{key:k,nombre:t.desc||"(sin descripción)",cat:t.category||"Otros",
       total:0,n:0,meses:{},last:""});
@@ -1157,6 +1375,7 @@ function renderSalud(){
     <div class="stat-grid">
       <div class="stat-box"><small>Ingresos</small><b class="pos">${clp(s.flow.ingresos)}</b></div>
       <div class="stat-box"><small>Gastos</small><b class="neg">${clp(s.flow.gastos)}</b></div>
+      ${s.flow.invertido?`<div class="stat-box"><small>Invertido</small><b>${clp(s.flow.invertido)}</b><span class="tiny-note">no es gasto: es ahorro</span></div>`:""}
     </div>
     <div class="health-note">Proyectado a fin de mes: <strong class="${s.proy.flujoProy>=0?'pos':'neg'}">${clp(s.proy.flujoProy)}</strong> · ${flowProyLabel}.</div>`;
 
@@ -1242,7 +1461,7 @@ function renderCreditCards(){
 
 function catBars(mk){
   const totals={};
-  data.transactions.filter(t=>t.type==="gasto" && (!mk||monthKey(t.date)===mk))
+  data.transactions.filter(t=>esGastoReal(t) && (!mk||monthKey(t.date)===mk))
     .forEach(t=>{ totals[t.category||"Otros"]=(totals[t.category||"Otros"]||0)+t.amount; });
   const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   const totalEl=document.getElementById("dash-cats-total");
@@ -1306,7 +1525,7 @@ function renderBudget(){
   const budgets=data.meta.budgets||{};
   const mk=monthKey(todayStr());
   const gastos={};
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk)
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk)
     .forEach(t=>gastos[t.category||"Otros"]=(gastos[t.category||"Otros"]||0)+t.amount);
   // Resumen general del presupuesto
   const totalObjetivo=CATS.reduce((s,c)=>s+(budgets[c]||0),0);
@@ -1352,7 +1571,7 @@ function renderPie(){
   const mk=monthKey(todayStr());
   document.getElementById("an-pie-month").textContent=monthLabel(mk);
   const totals={};
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk)
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk)
     .forEach(t=>totals[t.category||"Otros"]=(totals[t.category||"Otros"]||0)+t.amount);
   const entries=Object.entries(totals).sort((a,b)=>b[1]-a[1]);
   if(!entries.length){ el.innerHTML=`<div class="empty" style="width:100%">Sin gastos este mes.</div>`; return; }
@@ -1384,10 +1603,10 @@ function renderComparador(){
   const prev=monthsSpan().filter(m=>m<mk).slice(0,3);
   if(!prev.length){ el.innerHTML=`<div class="empty">Necesito al menos un mes anterior para comparar.</div>`; return; }
   const avg={}, cur={};
-  prev.forEach(m=>data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===m)
+  prev.forEach(m=>data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===m)
     .forEach(t=>avg[t.category||"Otros"]=(avg[t.category||"Otros"]||0)+t.amount));
   Object.keys(avg).forEach(c=>avg[c]=Math.round(avg[c]/prev.length));
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk)
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk)
     .forEach(t=>cur[t.category||"Otros"]=(cur[t.category||"Otros"]||0)+t.amount);
   const cats=[...new Set([...Object.keys(avg),...Object.keys(cur)])];
   const rows=cats.map(c=>({c,cur:cur[c]||0,avg:avg[c]||0,d:(cur[c]||0)-(avg[c]||0)}))
@@ -1464,7 +1683,7 @@ function renderHormiga(){
       ${months.map(m=>`<option value="${m}" ${hormigaMes===m?"selected":""}>${monthLabel(m)}</option>`).join("")}
     </select></div>`;
   const grupos={};
-  data.transactions.filter(t=>t.type==="gasto"&&t.amount<LIMITE&&t.category!=="Suscripciones"
+  data.transactions.filter(t=>esGastoReal(t)&&t.amount<LIMITE&&t.category!=="Suscripciones"
       &&(!hormigaMes||monthKey(t.date)===hormigaMes)).forEach(t=>{
     const k=(t.desc||"(sin descripción)").toLowerCase().replace(/compra\s+/g,"").trim().slice(0,28);
     (grupos[k]=grupos[k]||{n:0,tot:0,nombre:t.desc||"(sin descripción)"}).n++;
@@ -1873,7 +2092,7 @@ function renderAnalisis(){
   else { tips.push(`👏 Buen trabajo: estás ahorrando un ${tasaAhorro}% de tus ingresos este mes. Considera destinar ese excedente a pagar deudas o a un fondo de emergencia.`); }
   // categoría más alta
   const catTotals={};
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk).forEach(t=>catTotals[t.category||"Otros"]=(catTotals[t.category||"Otros"]||0)+t.amount);
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk).forEach(t=>catTotals[t.category||"Otros"]=(catTotals[t.category||"Otros"]||0)+t.amount);
   const topCat=Object.entries(catTotals).sort((a,b)=>b[1]-a[1])[0];
   if(topCat){ tips.push(`Tu mayor gasto este mes es <b>${topCat[0]}</b> con ${clp(topCat[1])} (${gas?Math.round(topCat[1]/gas*100):0}% del total). Si quieres recortar, parte por aquí.`); }
   html+=tips.map(t=>`<div class="tip">${t}</div>`).join("")+`</div>`;
@@ -2145,7 +2364,7 @@ function renderBudgetAlerts(){
   const budgets=(data.meta&&data.meta.budgets)||{};
   const mk=monthKey(todayStr());
   const gastos={};
-  data.transactions.filter(t=>t.type==="gasto"&&monthKey(t.date)===mk)
+  data.transactions.filter(t=>esGastoReal(t)&&monthKey(t.date)===mk)
     .forEach(t=>gastos[t.category||"Otros"]=(gastos[t.category||"Otros"]||0)+t.amount);
   const items=Object.keys(budgets).filter(c=>budgets[c]>0).map(c=>{
     const b=budgets[c], g=gastos[c]||0; return {c,b,g,pct:g/b*100};
