@@ -191,6 +191,61 @@ function cartolasCancelar(){
   if(inp) inp.value = "";
 }
 
+/* Cuadra cada cuenta con el saldo que informa su propia cartola, ajustando el
+   saldo inicial. Devuelve el detalle para poder explicarlo en pantalla.
+   Ojo: el ajuste ABSORBE cualquier diferencia, así que hay que mostrarlo
+   siempre — si algún día se debe a movimientos faltantes y no a pagos de
+   tarjeta, el usuario tiene que poder notarlo. */
+function cartolasCuadrarTodo(r){
+  const ajustes = [];
+  [["falabella_cc","Banco Falabella"], ["bci_cc","Banco BCI"], ["bancoestado","BancoEstado"]]
+    .forEach(par => {
+      const m = r.metas[par[0]];
+      if(!m || m.saldo === undefined) return;
+      const acc = data.accounts.find(a => a.name === par[1]);
+      if(!acc) return;
+      const calc = accountBalance(acc.id), dif = m.saldo - calc;
+      if(dif === 0) return;
+      acc.initial = (acc.initial || 0) + dif;
+      ajustes.push({cuenta: par[1], antes: calc, real: m.saldo, dif: dif,
+                    pagos: cartPagosTarjeta(r, par[0])});
+    });
+  return ajustes;
+}
+
+/* Pagos de tarjeta que venían en la cartola de esa cuenta y se excluyeron a
+   propósito: son la explicación habitual de que el saldo no cuadre. */
+function cartPagosTarjeta(r, tipo){
+  const producto = {falabella_cc:"Falabella Cuenta Corriente", bci_cc:"BCI Cuenta Corriente",
+                    bancoestado:"BancoEstado CuentaRUT"}[tipo];
+  return (r.excl || [])
+    .filter(e => e.producto === producto && e.motivo === "pago_tarjeta_credito")
+    .reduce((s,e) => s + (e.amount || 0), 0);
+}
+
+function cartolasAjustesHtml(ajustes){
+  if(!ajustes.length) return "";
+  const filas = ajustes.map(a => {
+    const explica = a.pagos > 0
+      ? (Math.abs(a.dif + a.pagos) < 2
+          ? '<span class="small muted">calza con el pago de tarjeta de ' + clp(a.pagos) + '</span>'
+          : '<span class="small muted">hay ' + clp(a.pagos) + ' en pagos de tarjeta</span>')
+      : '<span class="small neg">sin pagos de tarjeta que lo expliquen — vale la pena revisar</span>';
+    return '<tr><td><b>' + escHtml(a.cuenta) + '</b></td>' +
+      '<td style="text-align:right">' + clp(a.antes) + '</td>' +
+      '<td style="text-align:right"><b>' + clp(a.real) + '</b></td>' +
+      '<td style="text-align:right">' + (a.dif > 0 ? "+" : "") + clp(a.dif) + '</td>' +
+      '<td>' + explica + '</td></tr>';
+  }).join("");
+  return '<div class="panel"><h2>✅ Saldos puestos al día</h2>' +
+    '<p class="small muted">Se ajustaron para que queden iguales a los de tu banco. ' +
+    'La diferencia suele ser el pago de la tarjeta: sale de tu cuenta, pero no se anota ' +
+    'como gasto para no contar esa deuda dos veces.</p>' +
+    '<table><thead><tr><th>Cuenta</th><th style="text-align:right">Tenía</th>' +
+    '<th style="text-align:right">Ahora</th><th style="text-align:right">Ajuste</th>' +
+    '<th>Por qué</th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+}
+
 function cartolasAplicar(){
   if(!CART_PENDIENTE) return;
   const guardado = CART_PENDIENTE;
@@ -204,7 +259,10 @@ function cartolasAplicar(){
     data.transactions.push(tx);
     n++;
   });
-  if(n){ save(); renderAll(); }
+  // cuadrar los saldos con el banco en el mismo paso: si se deja como acción
+  // aparte, se olvida y la app queda mostrando un saldo que no es el real
+  const ajustes = cartolasCuadrarTodo(guardado);
+  if(n || ajustes.length){ save(); renderAll(); }
   CART_PENDIENTE = null;
   Object.keys(CART_CAT_MANUAL).forEach(k => delete CART_CAT_MANUAL[k]);
   const aviso = sinCuenta
@@ -212,7 +270,8 @@ function cartolasAplicar(){
     : "";
   document.getElementById("cart-resultado").innerHTML =
     '<div class="panel"><div class="empty">✓ Listo: ' + n + ' movimiento(s) agregados y sincronizados.</div>' +
-    aviso + '</div>' + cartolasChecklistHtml(guardado) + cartolasSaldosHtml(guardado);
+    aviso + '</div>' + cartolasAjustesHtml(ajustes) + cartolasChecklistHtml(guardado) +
+    cartolasSaldosHtml(guardado);
   const inp = document.getElementById("cart-files");
   if(inp) inp.value = "";
 }
