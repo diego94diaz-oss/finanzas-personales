@@ -191,6 +191,7 @@
         <div class="panel metric-card" id="health-liquidity-card"></div>
         <div class="panel metric-card" id="health-cashflow-card"></div>
       </div>
+      <div class="panel" id="health-semaforo"></div>
       <div class="health-grid">
         <div class="panel" id="health-balance-breakdown"></div>
         <div class="panel" id="health-liability-breakdown"></div>
@@ -1322,9 +1323,140 @@ function renderFijos(){
   }
 }
 
+/* ============ Semáforo de salud financiera ============
+   Traduce los números a un veredicto. Los rangos son los de uso habitual en
+   finanzas personales (fondo de emergencia de 3-6 meses, carga de deuda bajo
+   35% del ingreso, uso de tarjetas bajo 30%, etc.). Cada indicador vale
+   100 / 50 / 0 y la nota final es el promedio de los que se pueden calcular. */
+function saludIndicadores(s){
+  const ind = [];
+  const push = (nombre, valor, estado, refs, consejo) =>
+    ind.push({nombre, valor, estado, refs, consejo});
+
+  // 1. Fondo de emergencia: cuántos meses aguantas con lo que tienes líquido
+  if(s.coberturaMeses !== null && s.gastoBase > 0){
+    const m = s.coberturaMeses;
+    push("Fondo de emergencia", m.toFixed(1) + " meses",
+      m >= 3 ? "bien" : (m >= 1 ? "regular" : "mal"),
+      "sano: 3 meses o más",
+      m >= 3 ? "Tienes colchón para un imprevisto."
+             : "Con " + clp(s.gastoBase) + " de gasto al mes, apunta a juntar " +
+               clp(Math.round(s.gastoBase * 3)) + " líquidos.");
+  }
+
+  // 2. Tasa de ahorro del mes (lo invertido cuenta como ahorro, no como gasto)
+  if(s.flow.ingresos > 0){
+    const t = s.tasaAhorro;
+    push("Tasa de ahorro", t + "%",
+      t >= 20 ? "bien" : (t >= 5 ? "regular" : "mal"),
+      "sano: 20% o más",
+      t >= 20 ? "Estás guardando una parte sana de lo que ganas."
+              : "De cada $100 que entran, guardas $" + Math.max(0, t) + ".");
+  }
+
+  // Ingreso ESTABLE = promedio de los últimos sueldos. No sirve usar todos los
+  // ingresos del mes: una transferencia puntual de un tercero infla el denominador
+  // y hace parecer que la deuda pesa menos de lo que realmente pesa.
+  const sueldos = data.transactions.filter(t => t.type === "ingreso" && t.category === "Sueldo")
+                    .sort((a,b) => (a.date||"").localeCompare(b.date||"")).slice(-3).map(t => t.amount);
+  const sueldoProm = sueldos.length ? sueldos.reduce((a,b) => a+b, 0) / sueldos.length : 0;
+
+  // 3. Carga de deuda: cuánto de tu sueldo ya está comprometido en cuotas
+  const r = resumenDeudas();
+  const ingresoMes = sueldoProm || s.flow.ingresos;
+  if(ingresoMes > 0 && r.cuotaMes > 0){
+    const pct = Math.round(r.cuotaMes / ingresoMes * 100);
+    push("Carga de deuda", pct + "% de tus ingresos",
+      pct <= 15 ? "bien" : (pct <= 35 ? "regular" : "mal"),
+      "sano: hasta 35%",
+      "Pagas " + clp(r.cuotaMes) + " al mes en cuotas antes de gastar en nada más." +
+      (pct > 35 ? " Sobre 35% es zona de riesgo: un imprevisto te deja corto." : ""));
+  }
+
+  // 4. Uso del cupo de las tarjetas
+  const cupoTot = tarjetas().reduce((a,c) => a + (c.cupo || 0), 0);
+  if(cupoTot > 0){
+    const pct = Math.round(cardDebt() / cupoTot * 100);
+    push("Uso de tus tarjetas", pct + "% del cupo",
+      pct <= 30 ? "bien" : (pct <= 50 ? "regular" : "mal"),
+      "sano: hasta 30%",
+      "Usas " + clp(cardDebt()) + " de " + clp(cupoTot) + " de cupo." +
+      (pct > 50 ? " Sobre 50% aprieta y encarece cualquier crédito que pidas." : ""));
+  }
+
+  // 5. Patrimonio neto: ¿lo que tienes alcanza para lo que debes?
+  push("Patrimonio neto", clp(s.patrimonio),
+    s.patrimonio > 0 ? "bien" : (s.patrimonio > -s.activos ? "regular" : "mal"),
+    "sano: positivo",
+    s.patrimonio > 0 ? "Tus activos superan tus deudas."
+      : "Hoy debes " + clp(Math.abs(s.patrimonio)) + " más de lo que tienes. " +
+        "Es normal con un crédito grande en curso; lo importante es que baje mes a mes.");
+
+  // 6. Deuda total medida en sueldos: cuánto tiempo de trabajo representa
+  if(sueldoProm > 0 && s.pasivos > 0){
+    const veces = s.pasivos / (sueldoProm * 12);
+    push("Deuda vs. lo que ganas", veces.toFixed(1) + " años de sueldo",
+      veces <= 1 ? "bien" : (veces <= 2 ? "regular" : "mal"),
+      "sano: menos de 1 año",
+      "Tu deuda total equivale a " + veces.toFixed(1) + " años de tu sueldo líquido.");
+  }
+
+  const puntos = {bien:100, regular:50, mal:0};
+  const nota = ind.length ? Math.round(ind.reduce((a,i) => a + puntos[i.estado], 0) / ind.length) : null;
+  return {ind, nota};
+}
+
+function renderSaludSemaforo(s){
+  const box = document.getElementById("health-semaforo");
+  if(!box) return;
+  const {ind, nota} = saludIndicadores(s);
+  if(!ind.length){ box.innerHTML = ""; return; }
+
+  const color = {bien:"var(--green)", regular:"#f5a524", mal:"var(--red)"};
+  const icono = {bien:"🟢", regular:"🟡", mal:"🔴"};
+  const texto = {bien:"Bien", regular:"Atención", mal:"Mal"};
+
+  const veredicto = nota >= 75 ? ["Tu salud financiera es buena", "var(--green)"]
+                  : nota >= 50 ? ["Tu salud financiera es aceptable, con puntos a corregir", "#f5a524"]
+                               : ["Tu salud financiera necesita atención", "var(--red)"];
+  const flojos = ind.filter(i => i.estado === "mal");
+  const medios = ind.filter(i => i.estado === "regular");
+
+  const filas = ind.map(i => `
+    <div class="stack-row" style="align-items:flex-start;gap:12px">
+      <span style="font-size:17px;line-height:1.3">${icono[i.estado]}</span>
+      <span class="stack-label" style="flex:1">
+        <b>${i.nombre}</b>
+        <div class="small muted" style="margin-top:2px">${i.consejo}</div>
+      </span>
+      <span class="stack-value" style="text-align:right;white-space:nowrap">
+        <b style="color:${color[i.estado]}">${i.valor}</b>
+        <div class="small muted">${i.refs}</div>
+      </span>
+    </div>`).join("");
+
+  box.innerHTML = `
+    <h2>🩺 ¿Cómo está tu salud financiera?</h2>
+    <div class="flex" style="align-items:center;gap:18px;margin:10px 0 4px">
+      <div style="font-size:40px;font-weight:700;color:${veredicto[1]};line-height:1">${nota}</div>
+      <div>
+        <div style="font-size:15px;font-weight:600">${veredicto[0]}</div>
+        <div class="small muted">nota de 0 a 100, según los ${ind.length} indicadores de abajo</div>
+      </div>
+    </div>
+    <div class="progress" style="margin-bottom:6px"><div style="width:${nota}%;background:${veredicto[1]}"></div></div>
+    ${flojos.length || medios.length ? `<div class="health-note">
+      ${flojos.length ? `<b>Lo más urgente:</b> ${flojos.map(i => i.nombre.toLowerCase()).join(", ")}.` : ""}
+      ${medios.length ? ` <b>Para mejorar:</b> ${medios.map(i => i.nombre.toLowerCase()).join(", ")}.` : ""}
+    </div>` : `<div class="health-note">Todos tus indicadores están en verde. 👌</div>`}
+    <div class="mini-divider"></div>
+    <div class="stack-list">${filas}</div>`;
+}
+
 function renderSalud(){
   const s=financialSnapshot();
   const tone=healthTone(s);
+  renderSaludSemaforo(s);
   const hero=document.getElementById("health-hero");
   const liqCard=document.getElementById("health-liquidity-card");
   const flowCard=document.getElementById("health-cashflow-card");
