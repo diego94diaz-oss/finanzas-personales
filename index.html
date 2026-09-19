@@ -689,6 +689,15 @@ function accountBalance(accId){
 function totalBalance(){
   return data.accounts.filter(a=>!a.card && a.name!=="Movimientos internos")
                       .reduce((s,a)=>s+accountBalance(a.id),0); }
+// Desglose del líquido: efectivo físico por un lado, saldo en bancos por otro.
+// Se cumple bancos() + efectivoBalance() === totalBalance(): los tres excluyen las
+// tarjetas y la cuenta puente "Movimientos internos".
+function efectivoBalance(){
+  return data.accounts.filter(a=>!a.card && a.type==="efectivo" && a.name!=="Movimientos internos")
+                      .reduce((s,a)=>s+accountBalance(a.id),0); }
+function bancosBalance(){
+  return data.accounts.filter(a=>!a.card && a.type!=="efectivo" && a.name!=="Movimientos internos")
+                      .reduce((s,a)=>s+accountBalance(a.id),0); }
 function tarjetas(){ return data.accounts.filter(a=>a.card); }
 function cardDebt(){ return tarjetas().reduce((s,a)=>s+(a.utilizado||0),0); }
 function debtOnlyTotal(){ return data.debts.filter(d=>!d.incluidoEn).reduce((s,d)=>s+debtSaldo(d),0); }
@@ -767,8 +776,8 @@ function healthTone(s){
 function financialSnapshot(){
   const mk=monthKey(todayStr());
   const liquidez=totalBalance();
-  const efectivo=data.accounts.filter(a=>!a.card && a.type==="efectivo").reduce((s,a)=>s+accountBalance(a.id),0);
-  const bancos=data.accounts.filter(a=>!a.card && a.type!=="efectivo" && a.name!=="Movimientos internos").reduce((s,a)=>s+accountBalance(a.id),0);
+  const efectivo=efectivoBalance();
+  const bancos=bancosBalance();
   const inversiones=inversionesActuales();
   const deudaDeudas=debtOnlyTotal();
   const deudaTarjetas=cardDebt();
@@ -1158,7 +1167,9 @@ function renderInversiones(){
 function publicarResumen(){
   if(!data.meta || !_lastSync) return;
   const mk=monthKey(todayStr());
-  const r={ liquido:Math.round(totalBalance()), deudas:Math.round(debtOnlyTotal()), tarjetas:Math.round(cardDebt()),
+  const r={ liquido:Math.round(totalBalance()),
+            bancos:Math.round(bancosBalance()), efectivo:Math.round(efectivoBalance()),
+            deudas:Math.round(debtOnlyTotal()), tarjetas:Math.round(cardDebt()),
             deuda_total:Math.round(totalDebt()), invertido_mes:Math.round(sumInvertido(mk)),
             gastos_mes:Math.round(sumByType("gasto",mk)), ingresos_mes:Math.round(sumByType("ingreso",mk)) };
   const prev=data.meta.resumen||{};

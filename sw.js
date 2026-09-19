@@ -3,7 +3,7 @@
    Las llamadas a Supabase y a las fuentes (cross-origin) pasan directo a la red,
    salvo el lector de Excel, que se cachea aparte para poder cargar cartolas sin
    conexión. */
-const CACHE = "finanzas-sb-v17";   // v16: pestaña Inversiones y conexión con Mis Inversiones
+const CACHE = "finanzas-sb-v18";   // v18: el resumen publica el desglose bancos/efectivo
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./datos_cifrados.js",
   "./cartolas.js", "./cartolas_ui.js"];
 
