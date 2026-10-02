@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mis Finanzas Personales</title>
+<title>Finanzas</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="./cartolas.js"></script>
@@ -18,9 +18,9 @@
 </script>
 <meta name="theme-color" content="#0e0b1a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Mis Finanzas">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
 <link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261001">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -77,12 +77,19 @@
   .inv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px}
   .inv-shell table td,.inv-shell table th{padding:8px 10px}
 </style>
+
+<style id="app-branding">
+.app-brand-image{width:48px;height:48px;object-fit:contain;display:block;flex-shrink:0}
+.logo:has(.app-brand-image){width:48px;height:48px;background:none;border-radius:0;box-shadow:none;padding:0}
+.brand,.topbar-brand{display:flex;align-items:center;gap:10px}
+@media(max-width:640px){.app-brand-image,.logo:has(.app-brand-image){width:40px;height:40px}}
+</style>
 </head>
 <body>
 <div id="auth-overlay" style="position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;background:var(--bg);padding:20px">
   <div style="max-width:380px;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:28px">
     <div style="font-size:34px;text-align:center;margin-bottom:6px">💰</div>
-    <h2 style="margin:0 0 4px;text-align:center;font-family:var(--serif)">Mis Finanzas</h2>
+    <img class="app-brand-image" src="icon-192.png" alt="" style="width:80px;height:80px;margin:0 auto 12px"><h2 style="margin:0 0 4px;text-align:center;font-family:var(--serif)">Finanzas</h2>
     <p class="small muted" style="text-align:center;margin:0 0 18px">Ingresa para ver tus datos</p>
     <form id="auth-form" onsubmit="return false">
       <input id="auth-email" type="email" placeholder="Email" autocomplete="email" required
@@ -96,9 +103,9 @@
 </div>
 <header>
   <div class="brand">
-    <div class="logo" aria-hidden="true">$</div>
+    <div class="logo" aria-hidden="true"><img class="app-brand-image" src="icon-192.png" alt="" width="48" height="48"></div>
     <div>
-      <h1>Mis Finanzas</h1>
+      <h1>Finanzas</h1>
       <p>Tu asesor financiero personal · datos privados en tu equipo.</p>
     </div>
   </div>
