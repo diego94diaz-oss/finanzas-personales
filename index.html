@@ -512,7 +512,7 @@ let _lastSync = null;     // snapshot para calcular diffs
 
 function metaPrefs(){
   const m = data.meta || {};
-  return { budgets:m.budgets||{}, emergencyGoal:m.emergencyGoal||0, subsOff:m.subsOff||{},
+  return { pagosCiclo:(data.meta&&data.meta.pagosCiclo)||undefined, budgets:m.budgets||{}, emergencyGoal:m.emergencyGoal||0, subsOff:m.subsOff||{},
            recurring:m.recurring||[], catRules:m.catRules||[], fixedClass:m.fixedClass||{},
            resumen:m.resumen||null,
            createdAt:m.createdAt||new Date().toISOString() };
@@ -1297,9 +1297,6 @@ function saldoTrasSueldoYDeudas(){
   const mkCorte = cy + "-" + String(cm).padStart(2,"0");
   const corte = mkCorte + "-" + DIA_CORTE;
 
-  // ¿un pago que cae el día `diaPago` todavía está por delante?
-  const porDelante = diaPago => (dia > DIA_CORTE) ? true : diaPago >= dia;
-
   const saldoHoy = totalBalance();
   const partes = [];
 
@@ -1314,21 +1311,44 @@ function saldoTrasSueldoYDeudas(){
 
   // créditos que se pagan desde la cuenta (no los que van dentro de una tarjeta)
   data.debts.filter(x => x.tipo === "credito" && debtSaldo(x) > 0 && !x.incluidoEn).forEach(x => {
-    if(!porDelante(x.payDay || 1)) return;
-    partes.push({tipo:"menos", label:x.name+" (día "+(x.payDay||"?")+")", monto:x.cuota||0});
+    partes.push({tipo:"menos", label:x.name, monto:x.cuota||0});
   });
 
   // tarjetas de crédito
   tarjetas().forEach(acc => {
     const monto = pagoTarjetaMes(acc);
     if(monto <= 0) return;
-    const diaPago = acc.name.indexOf("CMR") >= 0 ? 25 : 23;
-    if(!porDelante(diaPago)) return;
-    partes.push({tipo:"menos", label:acc.name+" (día "+diaPago+")", monto});
+    partes.push({tipo:"menos", label:acc.name, monto});
+  });
+
+  // pagos fijos que salen del mismo sueldo y no son deuda (vivienda, etc.)
+  pagosCiclo().forEach(x => {
+    if(!x.monto) return;
+    partes.push({tipo:"menos", label:x.label, monto:x.monto, fijo:true, idx:x.idx});
   });
 
   const total = partes.reduce((s,x) => s + (x.tipo === "mas" ? x.monto : -x.monto), saldoHoy);
   return {saldoHoy, partes, total, corte, yaLlego};
+}
+
+/* Pagos fijos del ciclo que no son deuda registrada (vivienda, etc.).
+   Se guardan en meta para que el usuario pueda ajustarlos: el historial no
+   sirve para deducirlos porque varían (hay meses con abonos extra). */
+function pagosCiclo(){
+  if(!data.meta) data.meta = {};
+  if(!Array.isArray(data.meta.pagosCiclo)){
+    data.meta.pagosCiclo = [{label:"Vivienda", monto:250000}];
+  }
+  return data.meta.pagosCiclo.map((x,i) => ({label:x.label, monto:Number(x.monto)||0, idx:i}));
+}
+
+function editarPagoCiclo(idx, valor){
+  const n = Math.round(Number(valor));
+  if(isNaN(n) || n < 0) return;
+  if(!Array.isArray(data.meta.pagosCiclo)) return;
+  data.meta.pagosCiclo[idx].monto = n;
+  save();
+  renderAll();
 }
 
 function mesNombreLargo(fechaISO){
@@ -1346,7 +1366,12 @@ function renderSaldo25(){
   const filas = r.partes.map(x => `
     <div class="stack-row">
       <span class="stack-label">${x.tipo === "mas" ? "+" : "−"} ${escHtml(x.label)}</span>
-      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${clp(x.monto)}</span>
+      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${
+        x.fijo
+          ? `<input type="number" value="${x.monto}" title="Editable: ajusta si cambia"
+               onchange="editarPagoCiclo(${x.idx}, this.value)"
+               style="max-width:120px;text-align:right;display:inline-block">`
+          : clp(x.monto)}</span>
     </div>`).join("");
 
   const cls = r.total >= 0 ? "pos" : "neg";
@@ -1370,7 +1395,9 @@ function renderSaldo25(){
           <span class="stack-value ${cls}" style="font-size:20px"><b>${clp(r.total)}</b></span>
         </div>
       </div>
-      <div class="health-note">${nota}</div>
+      <div class="health-note">${nota}
+        <div class="small muted" style="margin-top:6px">Los montos con casilla los puedes
+        ajustar aquí mismo si cambian.</div></div>
     </div>`;
 }
 
