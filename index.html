@@ -136,6 +136,7 @@
   <section id="dashboard" class="section active">
     <div class="dashboard-shell">
       <div id="dash-frescura"></div>
+      <div id="dash-saldo25"></div>
       <div class="panel" id="dash-budget-panel" style="display:none">
         <h2>🚨 Alertas de presupuesto</h2>
         <div id="dash-budget-alerts"></div>
@@ -1270,7 +1271,111 @@ function irACartolas(){
   if(b) b.click();
 }
 
+/* ============ Saldo luego de sueldo y pago de deudas ============
+   Proyecta el saldo al día 25: ahí ya entró el sueldo (~24) y ya se pagaron el
+   crédito de consumo (~3), la Visa BCI (~23) y la CMR (~25). Si el día 25 de
+   este mes ya pasó, proyecta al del mes siguiente. */
+const DIA_SUELDO = 24, DIA_CORTE = 25;
+
+/* Cuánto hay que pagarle a una tarjeta en su próxima facturación.
+   El cupo utilizado trae las cuotas futuras adentro, así que se descuentan las
+   que NO se pagan este mes: a pagar = utilizado − (saldo en cuotas − cuota del mes). */
+function pagoTarjetaMes(acc){
+  const enCuotas = data.debts.filter(d => d.incluidoEn === acc.name && debtSaldo(d) > 0);
+  const quedanDespues = enCuotas.reduce((s,d) => s + Math.max(0, debtSaldo(d) - (d.cuota||0)), 0);
+  return Math.max(0, (acc.utilizado||0) - quedanDespues);
+}
+
+function saldoTrasSueldoYDeudas(){
+  const hoy = todayStr();
+  const dia = Number(hoy.slice(8,10));
+  // fecha de corte: el próximo día 25. Se arma con aritmética de texto a
+  // propósito: pasar por Date + toISOString corre la fecha un día, porque
+  // toISOString convierte a UTC y en Chile vamos -3/-4 horas.
+  let [cy, cm] = [Number(hoy.slice(0,4)), Number(hoy.slice(5,7))];
+  if(dia > DIA_CORTE){ cm++; if(cm > 12){ cm = 1; cy++; } }
+  const mkCorte = cy + "-" + String(cm).padStart(2,"0");
+  const corte = mkCorte + "-" + DIA_CORTE;
+
+  // ¿un pago que cae el día `diaPago` todavía está por delante?
+  const porDelante = diaPago => (dia > DIA_CORTE) ? true : diaPago >= dia;
+
+  const saldoHoy = totalBalance();
+  const partes = [];
+
+  // sueldo: solo si aún no ha llegado el de ese ciclo
+  const yaLlego = data.transactions.some(t => t.type === "ingreso" &&
+      t.category === "Sueldo" && monthKey(t.date) === mkCorte);
+  const sueldos = data.transactions.filter(t => t.type === "ingreso" && t.category === "Sueldo")
+      .sort((a,b) => (a.date||"").localeCompare(b.date||"")).slice(-3).map(t => t.amount);
+  const sueldoEsp = sueldos.length ? Math.round(sueldos.reduce((a,b)=>a+b,0)/sueldos.length) : 0;
+  const sumaSueldo = !yaLlego && sueldoEsp > 0;
+  if(sumaSueldo) partes.push({tipo:"mas", label:"Sueldo (≈ día "+DIA_SUELDO+")", monto:sueldoEsp});
+
+  // créditos que se pagan desde la cuenta (no los que van dentro de una tarjeta)
+  data.debts.filter(x => x.tipo === "credito" && debtSaldo(x) > 0 && !x.incluidoEn).forEach(x => {
+    if(!porDelante(x.payDay || 1)) return;
+    partes.push({tipo:"menos", label:x.name+" (día "+(x.payDay||"?")+")", monto:x.cuota||0});
+  });
+
+  // tarjetas de crédito
+  tarjetas().forEach(acc => {
+    const monto = pagoTarjetaMes(acc);
+    if(monto <= 0) return;
+    const diaPago = acc.name.indexOf("CMR") >= 0 ? 25 : 23;
+    if(!porDelante(diaPago)) return;
+    partes.push({tipo:"menos", label:acc.name+" (día "+diaPago+")", monto});
+  });
+
+  const total = partes.reduce((s,x) => s + (x.tipo === "mas" ? x.monto : -x.monto), saldoHoy);
+  return {saldoHoy, partes, total, corte, yaLlego};
+}
+
+function mesNombreLargo(fechaISO){
+  const m = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto",
+             "septiembre","octubre","noviembre","diciembre"];
+  return m[Number(fechaISO.slice(5,7)) - 1];
+}
+
+function renderSaldo25(){
+  const box = document.getElementById("dash-saldo25");
+  if(!box) return;
+  const r = saldoTrasSueldoYDeudas();
+  if(!r || !r.partes.length){ box.innerHTML = ""; return; }
+
+  const filas = r.partes.map(x => `
+    <div class="stack-row">
+      <span class="stack-label">${x.tipo === "mas" ? "+" : "−"} ${escHtml(x.label)}</span>
+      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${clp(x.monto)}</span>
+    </div>`).join("");
+
+  const cls = r.total >= 0 ? "pos" : "neg";
+  const nota = r.total < 0
+    ? "Con lo que tienes hoy no alcanza a cubrir todo. Vas a necesitar ajustar gastos o postergar algo."
+    : "Esto es lo que te quedaría disponible el 25, antes de los gastos del día a día.";
+
+  box.innerHTML = `
+    <div class="panel">
+      <h2>💰 Saldo luego de sueldo y pago de deudas</h2>
+      <p class="small muted">Cómo queda tu cuenta el <b>${DIA_CORTE} de ${mesNombreLargo(r.corte)}</b>,
+        cuando ya entró el sueldo y pagaste el crédito y las tarjetas.</p>
+      <div class="stack-list" style="margin-top:12px">
+        <div class="stack-row">
+          <span class="stack-label">Saldo de hoy</span>
+          <span class="stack-value">${clp(r.saldoHoy)}</span>
+        </div>
+        ${filas}
+        <div class="stack-row total">
+          <span class="stack-label"><b>Te quedaría</b></span>
+          <span class="stack-value ${cls}" style="font-size:20px"><b>${clp(r.total)}</b></span>
+        </div>
+      </div>
+      <div class="health-note">${nota}</div>
+    </div>`;
+}
+
 function renderDashboard(){
+  renderSaldo25();
   renderFrescura();
   const mk=monthKey(todayStr());
   const ingMes=sumByType("ingreso",mk), gasMes=sumByType("gasto",mk), invMes=sumInvertido(mk);
