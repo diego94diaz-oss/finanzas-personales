@@ -1342,14 +1342,6 @@ function pagosCiclo(){
   return data.meta.pagosCiclo.map((x,i) => ({label:x.label, monto:Number(x.monto)||0, idx:i}));
 }
 
-function editarPagoCiclo(idx, valor){
-  const n = Math.round(Number(valor));
-  if(isNaN(n) || n < 0) return;
-  if(!Array.isArray(data.meta.pagosCiclo)) return;
-  data.meta.pagosCiclo[idx].monto = n;
-  save();
-  renderAll();
-}
 
 function mesNombreLargo(fechaISO){
   const m = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto",
@@ -1366,12 +1358,7 @@ function renderSaldo25(){
   const filas = r.partes.map(x => `
     <div class="stack-row">
       <span class="stack-label">${x.tipo === "mas" ? "+" : "−"} ${escHtml(x.label)}</span>
-      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${
-        x.fijo
-          ? `<input type="number" value="${x.monto}" title="Editable: ajusta si cambia"
-               onchange="editarPagoCiclo(${x.idx}, this.value)"
-               style="max-width:120px;text-align:right;display:inline-block">`
-          : clp(x.monto)}</span>
+      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${clp(x.monto)}</span>
     </div>`).join("");
 
   const cls = r.total >= 0 ? "pos" : "neg";
@@ -1395,9 +1382,7 @@ function renderSaldo25(){
           <span class="stack-value ${cls}" style="font-size:20px"><b>${clp(r.total)}</b></span>
         </div>
       </div>
-      <div class="health-note">${nota}
-        <div class="small muted" style="margin-top:6px">Los montos con casilla los puedes
-        ajustar aquí mismo si cambian.</div></div>
+      <div class="health-note">${nota}</div>
     </div>`;
 }
 
