@@ -1355,34 +1355,27 @@ function renderSaldo25(){
   const r = saldoTrasSueldoYDeudas();
   if(!r || !r.partes.length){ box.innerHTML = ""; return; }
 
-  const filas = r.partes.map(x => `
-    <div class="stack-row">
-      <span class="stack-label">${x.tipo === "mas" ? "+" : "−"} ${escHtml(x.label)}</span>
-      <span class="stack-value ${x.tipo === "mas" ? "pos" : "neg"}">${clp(x.monto)}</span>
-    </div>`).join("");
+  const linea = (label, monto, clase) => `
+    <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted)">
+      <span>${escHtml(label)}</span>
+      <span class="num ${clase||''}" style="${clase?'':'color:#d8d2ec'}">${clp(monto)}</span>
+    </div>`;
 
-  const cls = r.total >= 0 ? "pos" : "neg";
-  const nota = r.total < 0
-    ? "Con lo que tienes hoy no alcanza a cubrir todo. Vas a necesitar ajustar gastos o postergar algo."
-    : "Esto es lo que te quedaría disponible el 25, antes de los gastos del día a día.";
-
+  const color = r.total >= 0 ? "var(--green)" : "var(--red)";
   box.innerHTML = `
-    <div class="panel">
-      <h2>💰 Saldo luego de sueldo y pago de deudas</h2>
-      <p class="small muted">Cómo queda tu cuenta el <b>${DIA_CORTE} de ${mesNombreLargo(r.corte)}</b>,
-        cuando ya entró el sueldo y pagaste el crédito y las tarjetas.</p>
-      <div class="stack-list" style="margin-top:12px">
-        <div class="stack-row">
-          <span class="stack-label">Saldo de hoy</span>
-          <span class="stack-value">${clp(r.saldoHoy)}</span>
-        </div>
-        ${filas}
-        <div class="stack-row total">
-          <span class="stack-label"><b>Te quedaría</b></span>
-          <span class="stack-value ${cls}" style="font-size:20px"><b>${clp(r.total)}</b></span>
-        </div>
+    <div class="panel" style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
+      <div style="min-width:230px">
+        <div class="kicker">Saldo luego de sueldo y pago de deudas</div>
+        <div class="metric-value" style="color:${color};margin:10px 0 4px">${clp(r.total)}</div>
+        <div class="small muted">al ${DIA_CORTE} de ${mesNombreLargo(r.corte)}, ya pagado todo</div>
       </div>
-      <div class="health-note">${nota}</div>
+      <div style="flex:1;min-width:290px;display:flex;flex-direction:column;gap:6px;font-size:12px">
+        ${linea("Saldo líquido hoy", r.saldoHoy)}
+        ${r.partes.map(x => linea(
+            (x.tipo === "mas" ? "+ " : "− ") + x.label,
+            x.monto,
+            x.tipo === "mas" ? "pos" : "")).join("")}
+      </div>
     </div>`;
 }
 
