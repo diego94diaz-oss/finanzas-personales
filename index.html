@@ -514,7 +514,7 @@ function metaPrefs(){
   const m = data.meta || {};
   return { pagosCiclo:(data.meta&&data.meta.pagosCiclo)||undefined, budgets:m.budgets||{}, emergencyGoal:m.emergencyGoal||0, subsOff:m.subsOff||{},
            recurring:m.recurring||[], catRules:m.catRules||[], fixedClass:m.fixedClass||{},
-           resumen:m.resumen||null,
+           resumen:m.resumen||null, facturado:m.facturado||{},
            createdAt:m.createdAt||new Date().toISOString() };
 }
 function setSyncStatus(s){
@@ -1287,8 +1287,12 @@ function comprasPostCierre(acc, mkCorte){
   if(!bd || bd >= DIA_CORTE) return {monto:0, cierre:null};
   const cierre = mkCorte + "-" + String(bd).padStart(2,"0");
   const hasta = acc.cupoAt || todayStr();
+  // Las devoluciones no son compras: si quedaron cargadas como "gasto" no se descuentan.
+  // (Verificado 13-10: ignorándolas, el estimado de la CMR quedó a $426 del estado de
+  // cuenta; restarlas en negativo lo alejaba. El banco tarda en reflejarlas en el cupo.)
+  const esDevolucion = t => /devoluci[oó]n|reversa|anulaci[oó]n/i.test(t.desc || "");
   const monto = data.transactions
-    .filter(t => t.type === "gasto" && t.account === acc.id && t.date > cierre && t.date <= hasta)
+    .filter(t => t.type === "gasto" && t.account === acc.id && t.date > cierre && t.date <= hasta && !esDevolucion(t))
     .reduce((s,t) => s + (t.amount||0), 0);
   return {monto, cierre};
 }
@@ -1301,7 +1305,26 @@ function pagoTarjetaMes(acc, mkCorte){
   const enCuotas = data.debts.filter(d => d.incluidoEn === acc.name && debtSaldo(d) > 0);
   const quedanDespues = enCuotas.reduce((s,d) => s + Math.max(0, debtSaldo(d) - (d.cuota||0)), 0);
   const post = mkCorte ? comprasPostCierre(acc, mkCorte) : {monto:0, cierre:null};
-  return {monto: Math.max(0, (acc.utilizado||0) - quedanDespues - post.monto), post};
+  // Si Diego ingresó el "Monto facturado" del estado de cuenta de ESTE cierre, manda ese.
+  const real = post.cierre && data.meta && data.meta.facturado && data.meta.facturado[acc.id];
+  if(real && real.cierre === post.cierre && real.monto > 0) return {monto: real.monto, post, real: true};
+  return {monto: Math.max(0, (acc.utilizado||0) - quedanDespues - post.monto), post, real: false};
+}
+
+/* ✎ en el panel: guarda el "Monto facturado" del estado de cuenta para el cierre vigente. */
+function editarFacturado(accId, cierre){
+  const acc = data.accounts.find(a => a.id === accId); if(!acc) return;
+  const dd = cierre.slice(8,10) + "-" + cierre.slice(5,7);
+  if(!data.meta) data.meta = {};
+  if(!data.meta.facturado) data.meta.facturado = {};
+  const actual = data.meta.facturado[accId];
+  const txt = prompt("Monto facturado de " + acc.name + " (estado de cuenta al " + dd + "). Déjalo vacío para volver al cálculo estimado.",
+                     actual && actual.cierre === cierre ? String(actual.monto) : "");
+  if(txt === null) return;
+  const n = Number(String(txt).replace(/[^0-9]/g, ""));
+  if(n > 0) data.meta.facturado[accId] = {cierre, monto: n, at: todayStr()};
+  else delete data.meta.facturado[accId];
+  save(); renderAll();
 }
 
 function saldoTrasSueldoYDeudas(){
@@ -1335,10 +1358,12 @@ function saldoTrasSueldoYDeudas(){
 
   // tarjetas de crédito
   tarjetas().forEach(acc => {
-    const {monto, post} = pagoTarjetaMes(acc, mkCorte);
+    const {monto, post, real} = pagoTarjetaMes(acc, mkCorte);
     if(monto > 0){
       const dd = post.cierre ? post.cierre.slice(8,10) + "-" + post.cierre.slice(5,7) : "";
-      partes.push({tipo:"menos", label: acc.name + (dd ? " (facturado al " + dd + ")" : ""), monto});
+      const sufijo = !dd ? "" : real ? " (estado de cuenta " + dd + ")" : " (estimado al " + dd + ")";
+      partes.push({tipo:"menos", label: acc.name + sufijo, monto,
+                   editar: post.cierre ? {accId: acc.id, cierre: post.cierre} : null});
     }
     if(post.monto > 0){
       const desde = String(Number(post.cierre.slice(8,10)) + 1).padStart(2,"0") + "-" + post.cierre.slice(5,7);
@@ -1380,9 +1405,11 @@ function renderSaldo25(){
   const r = saldoTrasSueldoYDeudas();
   if(!r || !r.partes.length){ box.innerHTML = ""; return; }
 
-  const linea = (label, monto, clase) => `
+  const linea = (label, monto, clase, editar) => `
     <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted)">
-      <span>${escHtml(label)}</span>
+      <span>${escHtml(label)}${editar ? ` <button class="btn" title="Ingresar el monto facturado del estado de cuenta"
+        style="padding:0 7px;font-size:11px;line-height:18px;margin-left:4px"
+        onclick="editarFacturado('${editar.accId}','${editar.cierre}')">✎ facturado</button>` : ""}</span>
       <span class="num ${clase||''}" style="${clase?'':'color:#d8d2ec'}">${clp(monto)}</span>
     </div>`;
 
@@ -1399,7 +1426,7 @@ function renderSaldo25(){
         ${r.partes.map(x => linea(
             (x.tipo === "mas" ? "+ " : "− ") + x.label,
             x.monto,
-            x.tipo === "mas" ? "pos" : "")).join("")}
+            x.tipo === "mas" ? "pos" : "", x.editar)).join("")}
         ${r.notas.map(n => `
           <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted);opacity:.75;font-style:italic">
             <span>ℹ ${escHtml(n.label)}</span><span class="num">${clp(n.monto)}</span>
