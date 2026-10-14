@@ -1277,13 +1277,31 @@ function irACartolas(){
    este mes ya pasó, proyecta al del mes siguiente. */
 const DIA_SUELDO = 24, DIA_CORTE = 25;
 
+/* Compras hechas DESPUÉS del cierre de la facturación que se paga en este ciclo.
+   Ej.: la CMR cierra el 9 y se paga ~25 → lo comprado del 10 en adelante se
+   factura el mes siguiente y no entra en este pago. Solo se cuentan compras ya
+   incluidas en el cupo utilizado (hasta `cupoAt`, fecha en que se actualizó).
+   Si la tarjeta cierra el mismo día del corte o después (BCI Visa, 25), no aplica. */
+function comprasPostCierre(acc, mkCorte){
+  const bd = Number(acc.billingDay);
+  if(!bd || bd >= DIA_CORTE) return {monto:0, cierre:null};
+  const cierre = mkCorte + "-" + String(bd).padStart(2,"0");
+  const hasta = acc.cupoAt || todayStr();
+  const monto = data.transactions
+    .filter(t => t.type === "gasto" && t.account === acc.id && t.date > cierre && t.date <= hasta)
+    .reduce((s,t) => s + (t.amount||0), 0);
+  return {monto, cierre};
+}
+
 /* Cuánto hay que pagarle a una tarjeta en su próxima facturación.
    El cupo utilizado trae las cuotas futuras adentro, así que se descuentan las
-   que NO se pagan este mes: a pagar = utilizado − (saldo en cuotas − cuota del mes). */
-function pagoTarjetaMes(acc){
+   que NO se pagan este mes: a pagar = utilizado − (saldo en cuotas − cuota del mes).
+   Además se descuentan las compras posteriores al cierre (van al mes siguiente). */
+function pagoTarjetaMes(acc, mkCorte){
   const enCuotas = data.debts.filter(d => d.incluidoEn === acc.name && debtSaldo(d) > 0);
   const quedanDespues = enCuotas.reduce((s,d) => s + Math.max(0, debtSaldo(d) - (d.cuota||0)), 0);
-  return Math.max(0, (acc.utilizado||0) - quedanDespues);
+  const post = mkCorte ? comprasPostCierre(acc, mkCorte) : {monto:0, cierre:null};
+  return {monto: Math.max(0, (acc.utilizado||0) - quedanDespues - post.monto), post};
 }
 
 function saldoTrasSueldoYDeudas(){
@@ -1299,6 +1317,7 @@ function saldoTrasSueldoYDeudas(){
 
   const saldoHoy = totalBalance();
   const partes = [];
+  const notas = [];   // informativas: no suman ni restan
 
   // sueldo: solo si aún no ha llegado el de ese ciclo
   const yaLlego = data.transactions.some(t => t.type === "ingreso" &&
@@ -1316,9 +1335,15 @@ function saldoTrasSueldoYDeudas(){
 
   // tarjetas de crédito
   tarjetas().forEach(acc => {
-    const monto = pagoTarjetaMes(acc);
-    if(monto <= 0) return;
-    partes.push({tipo:"menos", label:acc.name, monto});
+    const {monto, post} = pagoTarjetaMes(acc, mkCorte);
+    if(monto > 0){
+      const dd = post.cierre ? post.cierre.slice(8,10) + "-" + post.cierre.slice(5,7) : "";
+      partes.push({tipo:"menos", label: acc.name + (dd ? " (facturado al " + dd + ")" : ""), monto});
+    }
+    if(post.monto > 0){
+      const desde = String(Number(post.cierre.slice(8,10)) + 1).padStart(2,"0") + "-" + post.cierre.slice(5,7);
+      notas.push({label: acc.name + ": compras desde el " + desde + " (se pagan el mes siguiente)", monto: post.monto});
+    }
   });
 
   // pagos fijos que salen del mismo sueldo y no son deuda (vivienda, etc.)
@@ -1328,7 +1353,7 @@ function saldoTrasSueldoYDeudas(){
   });
 
   const total = partes.reduce((s,x) => s + (x.tipo === "mas" ? x.monto : -x.monto), saldoHoy);
-  return {saldoHoy, partes, total, corte, yaLlego};
+  return {saldoHoy, partes, notas, total, corte, yaLlego};
 }
 
 /* Pagos fijos del ciclo que no son deuda registrada (vivienda, etc.).
@@ -1375,6 +1400,10 @@ function renderSaldo25(){
             (x.tipo === "mas" ? "+ " : "− ") + x.label,
             x.monto,
             x.tipo === "mas" ? "pos" : "")).join("")}
+        ${r.notas.map(n => `
+          <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted);opacity:.75;font-style:italic">
+            <span>ℹ ${escHtml(n.label)}</span><span class="num">${clp(n.monto)}</span>
+          </div>`).join("")}
       </div>
     </div>`;
 }
