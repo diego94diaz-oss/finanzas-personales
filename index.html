@@ -1274,7 +1274,10 @@ function irACartolas(){
 /* ============ Saldo luego de sueldo y pago de deudas ============
    Proyecta el saldo al día 25: ahí ya entró el sueldo (~24) y ya se pagaron el
    crédito de consumo (~3), la Visa BCI (~23) y la CMR (~25). Si el día 25 de
-   este mes ya pasó, proyecta al del mes siguiente. */
+   este mes ya pasó, proyecta al del mes siguiente.
+   Lo que YA ocurrió en el ciclo (sueldo recibido, cuota pagada, tarjeta pagada,
+   vivienda transferida) ya está dentro del saldo de hoy: se muestra con ✓ y no
+   se vuelve a sumar ni restar (2026-10-23: antes restaba otra vez lo ya pagado). */
 const DIA_SUELDO = 24, DIA_CORTE = 25;
 
 /* Compras hechas DESPUÉS del cierre de la facturación que se paga en este ciclo.
@@ -1297,18 +1300,38 @@ function comprasPostCierre(acc, mkCorte){
   return {monto, cierre};
 }
 
+/* ¿Se registró un pago de esta deuda dentro del ciclo [desde, hasta]? */
+function cuotaPagadaEnCiclo(d, desde, hasta){
+  return (d.payments||[]).some(p => p.date >= desde && p.date <= hasta);
+}
+
 /* Cuánto hay que pagarle a una tarjeta en su próxima facturación.
    El cupo utilizado trae las cuotas futuras adentro, así que se descuentan las
    que NO se pagan este mes: a pagar = utilizado − (saldo en cuotas − cuota del mes).
-   Además se descuentan las compras posteriores al cierre (van al mes siguiente). */
+   Si la cuota del mes ya quedó registrada como pagada en el ciclo, su saldo ya
+   no la incluye y no se vuelve a restar.
+   Además se descuentan las compras posteriores al cierre (van al mes siguiente).
+
+   `pagada`: la facturación del ciclo ya se pagó. El pago de una tarjeta no es un
+   movimiento (se excluye para no contar dos veces la deuda), así que se deduce
+   del cupo: si lo usado, sin las compras posteriores al cierre, ya no supera lo
+   que queda en cuotas futuras, no queda nada facturado por pagar.
+   Verificado 23-10: CMR 2.819.745 − 2.347.007 = 472.738 ≤ 711.837 en cuotas → pagada;
+   al 13-10 (antes de pagar) 3.149.647 > 711.837 → por pagar. */
+const TOLERANCIA_PAGADA = 10000;
 function pagoTarjetaMes(acc, mkCorte){
+  const desde = mkCorte ? mkCorte + "-01" : "", hasta = mkCorte ? mkCorte + "-" + DIA_CORTE : "";
   const enCuotas = data.debts.filter(d => d.incluidoEn === acc.name && debtSaldo(d) > 0);
-  const quedanDespues = enCuotas.reduce((s,d) => s + Math.max(0, debtSaldo(d) - (d.cuota||0)), 0);
+  const quedanDespues = enCuotas.reduce((s,d) => s + Math.max(0, debtSaldo(d) -
+      (mkCorte && cuotaPagadaEnCiclo(d, desde, hasta) ? 0 : (d.cuota||0))), 0);
   const post = mkCorte ? comprasPostCierre(acc, mkCorte) : {monto:0, cierre:null};
+  const facturadoHoy = (acc.utilizado||0) - post.monto;   // lo usado que ya está facturado
+  const cupoAlDia = !!mkCorte && (acc.cupoAt||"") >= desde;
+  const pagada = cupoAlDia && facturadoHoy <= quedanDespues + TOLERANCIA_PAGADA;
   // Si Diego ingresó el "Monto facturado" del estado de cuenta de ESTE cierre, manda ese.
   const real = post.cierre && data.meta && data.meta.facturado && data.meta.facturado[acc.id];
-  if(real && real.cierre === post.cierre && real.monto > 0) return {monto: real.monto, post, real: true};
-  return {monto: Math.max(0, (acc.utilizado||0) - quedanDespues - post.monto), post, real: false};
+  if(real && real.cierre === post.cierre && real.monto > 0) return {monto: real.monto, post, real: true, pagada};
+  return {monto: Math.max(0, facturadoHoy - quedanDespues), post, real: false, pagada};
 }
 
 /* ✎ en el panel: guarda el "Monto facturado" del estado de cuenta para el cierre vigente. */
@@ -1337,48 +1360,73 @@ function saldoTrasSueldoYDeudas(){
   if(dia > DIA_CORTE){ cm++; if(cm > 12){ cm = 1; cy++; } }
   const mkCorte = cy + "-" + String(cm).padStart(2,"0");
   const corte = mkCorte + "-" + DIA_CORTE;
+  // Ciclo de pagos: del 1 al 25 del mes del corte. Lo que se paga con el sueldo
+  // cae ahí (2026-09: sueldo 16-09 y pagos 15/16-09; 2026-10: todo el 23-10).
+  const desde = mkCorte + "-01";
+  const enCiclo = t => t.date >= desde && t.date <= corte;
+  const dm = f => f.slice(8,10) + "-" + f.slice(5,7);
+  const esCuenta = id => { const a = data.accounts.find(x => x.id === id); return !!a && !a.card; };
 
   const saldoHoy = totalBalance();
-  const partes = [];
+  const partes = [];  // pagado:true = ya ocurrió y está dentro del saldo de hoy: no suma ni resta
   const notas = [];   // informativas: no suman ni restan
 
-  // sueldo: solo si aún no ha llegado el de ese ciclo
-  const yaLlego = data.transactions.some(t => t.type === "ingreso" &&
-      t.category === "Sueldo" && monthKey(t.date) === mkCorte);
+  // sueldo: solo se suma si aún no ha llegado el de ese ciclo
+  const recibido = data.transactions.filter(t => t.type === "ingreso" &&
+      t.category === "Sueldo" && monthKey(t.date) === mkCorte)
+      .sort((a,b) => (a.date||"").localeCompare(b.date||"")).pop();
+  const yaLlego = !!recibido;
   const sueldos = data.transactions.filter(t => t.type === "ingreso" && t.category === "Sueldo")
       .sort((a,b) => (a.date||"").localeCompare(b.date||"")).slice(-3).map(t => t.amount);
   const sueldoEsp = sueldos.length ? Math.round(sueldos.reduce((a,b)=>a+b,0)/sueldos.length) : 0;
-  const sumaSueldo = !yaLlego && sueldoEsp > 0;
-  if(sumaSueldo) partes.push({tipo:"mas", label:"Sueldo (≈ día "+DIA_SUELDO+")", monto:sueldoEsp});
+  if(yaLlego) partes.push({tipo:"mas", label:"Sueldo (recibido " + dm(recibido.date) + ")", monto:recibido.amount, pagado:true});
+  else if(sueldoEsp > 0) partes.push({tipo:"mas", label:"Sueldo (≈ día "+DIA_SUELDO+")", monto:sueldoEsp});
 
-  // créditos que se pagan desde la cuenta (no los que van dentro de una tarjeta)
-  data.debts.filter(x => x.tipo === "credito" && debtSaldo(x) > 0 && !x.incluidoEn).forEach(x => {
-    partes.push({tipo:"menos", label:x.name, monto:x.cuota||0});
+  // créditos que se pagan desde la cuenta (no los que van dentro de una tarjeta).
+  // Pagado si la cuota quedó registrada en el ciclo o si hay un cargo "Deudas y
+  // cuotas" por ese monto desde una cuenta (ej. "Pago Credito" de la cartola BCI).
+  data.debts.filter(x => x.tipo === "credito" && !x.incluidoEn).forEach(x => {
+    const cuota = x.cuota || 0;
+    const reg = (x.payments||[]).filter(p => p.date >= desde && p.date <= corte).pop();
+    const mov = data.transactions.filter(t => t.type === "gasto" && enCiclo(t) && esCuenta(t.account) &&
+        t.category === "Deudas y cuotas" && Math.abs((t.amount||0) - cuota) <= Math.max(1000, cuota*0.01)).pop();
+    const hecho = reg || mov;
+    if(hecho) partes.push({tipo:"menos", label:x.name + " (pagado " + dm(hecho.date) + ")", monto:hecho.amount||cuota, pagado:true});
+    else if(debtSaldo(x) > 0) partes.push({tipo:"menos", label:x.name, monto:cuota});
   });
 
   // tarjetas de crédito
   tarjetas().forEach(acc => {
-    const {monto, post, real} = pagoTarjetaMes(acc, mkCorte);
-    if(monto > 0){
-      const dd = post.cierre ? post.cierre.slice(8,10) + "-" + post.cierre.slice(5,7) : "";
+    const {monto, post, real, pagada} = pagoTarjetaMes(acc, mkCorte);
+    const dd = post.cierre ? dm(post.cierre) : "";
+    if(pagada){
+      partes.push({tipo:"menos", pagado:true, monto: real ? monto : null,
+                   label: acc.name + (dd ? " (facturado al " + dd + ", pagado)" : " (pagada)")});
+    } else if(monto > 0){
       const sufijo = !dd ? "" : real ? " (estado de cuenta " + dd + ")" : " (estimado al " + dd + ")";
       partes.push({tipo:"menos", label: acc.name + sufijo, monto,
                    editar: post.cierre ? {accId: acc.id, cierre: post.cierre} : null});
     }
     if(post.monto > 0){
-      const desde = String(Number(post.cierre.slice(8,10)) + 1).padStart(2,"0") + "-" + post.cierre.slice(5,7);
-      notas.push({label: acc.name + ": compras desde el " + desde + " (se pagan el mes siguiente)", monto: post.monto});
+      const desdeC = String(Number(post.cierre.slice(8,10)) + 1).padStart(2,"0") + "-" + post.cierre.slice(5,7);
+      notas.push({label: acc.name + ": compras desde el " + desdeC + " (se pagan el mes siguiente)", monto: post.monto});
     }
   });
 
-  // pagos fijos que salen del mismo sueldo y no son deuda (vivienda, etc.)
+  // pagos fijos que salen del mismo sueldo y no son deuda (vivienda, etc.).
+  // Pagado si en el ciclo hay un gasto de esa categoría por al menos el 90% del monto.
   pagosCiclo().forEach(x => {
     if(!x.monto) return;
-    partes.push({tipo:"menos", label:x.label, monto:x.monto, fijo:true, idx:x.idx});
+    const mov = data.transactions.filter(t => t.type === "gasto" && enCiclo(t) && esCuenta(t.account) &&
+        (t.category||"").toLowerCase() === x.label.toLowerCase() && (t.amount||0) >= x.monto*0.9).pop();
+    if(mov) partes.push({tipo:"menos", label:x.label + " (pagado " + dm(mov.date) + ")", monto:mov.amount, fijo:true, idx:x.idx, pagado:true});
+    else partes.push({tipo:"menos", label:x.label, monto:x.monto, fijo:true, idx:x.idx});
   });
 
-  const total = partes.reduce((s,x) => s + (x.tipo === "mas" ? x.monto : -x.monto), saldoHoy);
-  return {saldoHoy, partes, notas, total, corte, yaLlego};
+  const total = partes.filter(x => !x.pagado)
+      .reduce((s,x) => s + (x.tipo === "mas" ? x.monto : -x.monto), saldoHoy);
+  const todoHecho = yaLlego && partes.every(x => x.pagado);
+  return {saldoHoy, partes, notas, total, corte, yaLlego, todoHecho};
 }
 
 /* Pagos fijos del ciclo que no son deuda registrada (vivienda, etc.).
@@ -1403,7 +1451,7 @@ function renderSaldo25(){
   const box = document.getElementById("dash-saldo25");
   if(!box) return;
   const r = saldoTrasSueldoYDeudas();
-  if(!r || !r.partes.length){ box.innerHTML = ""; return; }
+  if(!r){ box.innerHTML = ""; return; }
 
   const linea = (label, monto, clase, editar) => `
     <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted)">
@@ -1412,21 +1460,33 @@ function renderSaldo25(){
         onclick="editarFacturado('${editar.accId}','${editar.cierre}')">✎ facturado</button>` : ""}</span>
       <span class="num ${clase||''}" style="${clase?'':'color:#d8d2ec'}">${clp(monto)}</span>
     </div>`;
+  // ya ocurrió: está dentro del saldo de hoy; se muestra para que se vea que se consideró
+  const hecho = x => `
+    <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted);opacity:.6"
+      title="Ya ocurrió: está incluido en el saldo líquido de hoy">
+      <span>✓ ${escHtml(x.label)}</span>
+      <span class="num" style="text-decoration:line-through">${x.monto ? clp(x.monto) : "—"}</span>
+    </div>`;
 
+  const pendientes = r.partes.filter(x => !x.pagado), hechos = r.partes.filter(x => x.pagado);
+  const sub = r.todoHecho
+    ? `sueldo recibido y pagos de ${mesNombreLargo(r.corte)} hechos: es tu saldo real`
+    : `al ${DIA_CORTE} de ${mesNombreLargo(r.corte)}, ya pagado todo`;
   const color = r.total >= 0 ? "var(--green)" : "var(--red)";
   box.innerHTML = `
     <div class="panel" style="display:flex;gap:28px;flex-wrap:wrap;align-items:center">
       <div style="min-width:230px">
         <div class="kicker">Saldo luego de sueldo y pago de deudas</div>
         <div class="metric-value" style="color:${color};margin:10px 0 4px">${clp(r.total)}</div>
-        <div class="small muted">al ${DIA_CORTE} de ${mesNombreLargo(r.corte)}, ya pagado todo</div>
+        <div class="small muted">${sub}</div>
       </div>
       <div style="flex:1;min-width:290px;display:flex;flex-direction:column;gap:6px;font-size:12px">
         ${linea("Saldo líquido hoy", r.saldoHoy)}
-        ${r.partes.map(x => linea(
+        ${pendientes.map(x => linea(
             (x.tipo === "mas" ? "+ " : "− ") + x.label,
             x.monto,
             x.tipo === "mas" ? "pos" : "", x.editar)).join("")}
+        ${hechos.map(hecho).join("")}
         ${r.notas.map(n => `
           <div style="display:flex;justify-content:space-between;gap:14px;color:var(--muted);opacity:.75;font-style:italic">
             <span>ℹ ${escHtml(n.label)}</span><span class="num">${clp(n.monto)}</span>

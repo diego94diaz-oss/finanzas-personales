@@ -89,6 +89,12 @@ function esPagoTarjeta(desc){
           "pago tarjeta de cr","monto cancelado","pago tarjeta visa",
           "pago tarjeta de credito visa"].some(p => d.includes(p));
 }
+/* Devolución de una compra en la tarjeta: es plata que vuelve, no un gasto.
+   (2026-10: "DEVOLUCION COMPRA MERPAGO*ALIPAYSINGAPO" entraba como gasto y
+   sumaba al gasto del mes en vez de restar.) */
+function esDevolucion(desc){
+  return /devoluci[oó]n|reversa|anulaci[oó]n/i.test(desc||"");
+}
 function esTransfInterna(desc){
   const d = (desc||"").toLowerCase();
   return d.includes("diego") || d.includes("diaz matama");
@@ -202,7 +208,10 @@ function parseBciVisa(rows, fname){
     if(monto < 0){ excl.push({...base, motivo:"pago_o_devolucion(monto_negativo)", amount:-monto}); return; }
     if(desc.toLowerCase().includes("fondo credito udec")){
       excl.push({...base, motivo:"resumen_cuotas_no_es_cargo_nuevo", amount:monto}); return; }
-    movs.push({...base, direction:"cargo", amount:monto});
+    // El abono de tu pago ("MONTO CANCELADO") puede venir en POSITIVO en el
+    // archivo: no es compra. Se colaba como gasto (sep/oct 2026) o ingreso (abr/may).
+    if(esPagoTarjeta(desc)){ excl.push({...base, motivo:"pago_tarjeta_credito", amount:monto}); return; }
+    movs.push({...base, direction: esDevolucion(desc) ? "abono" : "cargo", amount:monto});
   });
   return {movs, excl, meta};
 }
@@ -239,7 +248,7 @@ function parseCmr(archivos){
     const k = date + "|" + Math.abs(monto) + "|" + normDesc(desc);
     if(vistos.has(k)){ excl.push({...base, motivo:"traslape_entre_archivos(ya_en_"+vistos.get(k)+")"}); return; }
     vistos.set(k, fname);
-    movs.push({...base, direction:"cargo", amount:monto});
+    movs.push({...base, direction: esDevolucion(desc) ? "abono" : "cargo", amount:monto});
   }));
   return {movs, excl, meta:{}};
 }
@@ -424,7 +433,7 @@ function construir(c){
   let cat;
   if(d.includes("proveedor") && c.cuenta === "Banco Falabella")
     cat = c.amount >= 2000000 ? "Sueldo" : "Horas Extraordinarias/Bonos";
-  else if(d.startsWith("tef de") || d.startsWith("transferencia de") || d.startsWith("transf. de"))
+  else if(d.startsWith("tef de") || d.startsWith("transferencia de") || d.startsWith("transf. de") || esDevolucion(c.desc))
     cat = "Reembolsos / Terceros";
   else cat = "Otros ingresos";
   return {type:"ingreso", amount:c.amount, date:c.date, account:cta, desc:c.desc, category:cat};
