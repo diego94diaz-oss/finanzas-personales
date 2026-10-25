@@ -23,7 +23,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261001">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0e0b1a; --panel:#18142b; --panel2:#211a36; --panel3:#120f22;
@@ -78,6 +78,106 @@
   .inv-shell table td,.inv-shell table th{padding:8px 10px}
 </style>
 
+<style id="estilo-libro">
+/* ===== Estilo «Libro» (2026-10-24) =====
+   Libro contable: papel y tinta, un solo acento verde, títulos con serifa y
+   números en monoespaciada tabular. Se activa con data-estilo="libro" en <html>;
+   el estilo «Neón» original no se toca. Funciona con modo claro y oscuro. */
+[data-estilo="libro"]{
+  --bg:#15171a; --panel:#1c1f23; --panel2:#23272c; --panel3:#181a1e;
+  --text:#ece8de; --muted:#9a958a; --soft:#c9c3b6; --line:rgba(236,232,222,.11); --border:rgba(236,232,222,.11);
+  --accent:#7fc6a4; --accent2:#e08f7a; --cyan:#8db8dc; --green:#86d1ab; --green-strong:#5cb68a;
+  --red:#ef9a8a; --amber:#e3b467; --ink:#15171a; --accent-soft:rgba(127,198,164,.14);
+  --hero:var(--panel); --grad:linear-gradient(var(--accent),var(--accent));
+  --shadow:0 18px 40px -24px rgba(0,0,0,.55);
+  --font:"IBM Plex Sans","Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  --num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --serif:"Fraunces",Georgia,"Times New Roman",serif;
+}
+[data-estilo="libro"][data-theme="light"]{
+  --bg:#f3efe6; --panel:#fffdf8; --panel2:#ece6da; --panel3:#faf7f0;
+  --text:#1d1b16; --muted:#6b655a; --soft:#4f4a40; --line:rgba(29,27,22,.13); --border:rgba(29,27,22,.13);
+  --accent:#1f5c45; --accent2:#9a3b2a; --cyan:#2f5f86; --green:#1f7a52; --green-strong:#17603f;
+  --red:#b23a2b; --amber:#9a620f; --ink:#fffdf8; --accent-soft:rgba(31,92,69,.10);
+  --shadow:0 14px 34px -22px rgba(40,30,10,.30);
+}
+[data-estilo="libro"] body{font-size:15px;letter-spacing:0}
+[data-estilo="libro"] .num,[data-estilo="libro"] .big{letter-spacing:0}
+[data-estilo="libro"] ::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
+
+/* encabezado y navegación: subrayado en vez de píldora con degradado */
+[data-estilo="libro"] header{border-bottom:2px solid var(--text)}
+[data-estilo="libro"] header h1{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:-.01em}
+[data-estilo="libro"] nav{padding-top:6px;padding-bottom:0;gap:2px}
+[data-estilo="libro"] nav button{border-radius:0;padding:10px 12px 9px;font-weight:500;border-bottom:2px solid transparent}
+[data-estilo="libro"] nav button:hover{background:transparent;color:var(--text);border-bottom-color:var(--line)}
+[data-estilo="libro"] nav button.active{background:none;color:var(--text);font-weight:600;border-bottom-color:var(--accent)}
+
+/* superficies: planas, esquinas casi rectas, filete fino */
+[data-estilo="libro"] .panel,[data-estilo="libro"] .card,[data-estilo="libro"] .hero-card,
+[data-estilo="libro"] .modal-card{border-radius:6px;border:1px solid var(--line)}
+[data-estilo="libro"] .panel h2,[data-estilo="libro"] .card h3{font-family:var(--serif);font-size:18px;font-weight:600;
+  text-transform:none;letter-spacing:-.005em;color:var(--text)}
+/* filete bajo el título solo cuando el título ocupa su propia fila */
+[data-estilo="libro"] .panel>h2,[data-estilo="libro"] .card>h3{padding-bottom:10px;border-bottom:1px solid var(--line)}
+[data-estilo="libro"] .kicker{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:600}
+[data-estilo="libro"] .hero-card{background:var(--panel);border-top:3px solid var(--accent)}
+[data-estilo="libro"] .hero-card:before{display:none}
+[data-estilo="libro"] .hero-value{font-size:42px;font-weight:500;letter-spacing:-.02em}
+[data-estilo="libro"] .metric-value,[data-estilo="libro"] .card .big{font-weight:500;letter-spacing:-.01em}
+[data-estilo="libro"] .mini-box{background:var(--panel3);border:1px solid var(--line);border-radius:4px}
+[data-estilo="libro"] .chip{border-radius:3px;color:var(--ink)}
+[data-estilo="libro"] .chip.pink{background:var(--accent-soft);color:var(--red)}
+
+/* listas, tarjetas internas y notas */
+[data-estilo="libro"] .pay-item,[data-estilo="libro"] .stack-row,[data-estilo="libro"] .stat-box,
+[data-estilo="libro"] .concept-item,[data-estilo="libro"] .health-note,[data-estilo="libro"] .tip,
+[data-estilo="libro"] .health-badge{border-radius:4px;background:var(--panel3)!important;border:1px solid var(--line)}
+[data-estilo="libro"] .stack-row.total{background:var(--accent-soft)!important;border-color:var(--accent)}
+[data-estilo="libro"] .pay-date{border-radius:3px;font-family:var(--num)}
+[data-estilo="libro"] .cat-dot{border-radius:1px}
+[data-estilo="libro"] .cat-name{color:var(--text)}
+
+/* barras y medidores */
+[data-estilo="libro"] .meter,[data-estilo="libro"] .bar-track,[data-estilo="libro"] .progress{background:var(--line);border-radius:1px}
+[data-estilo="libro"] .meter>div,[data-estilo="libro"] .bar-fill,[data-estilo="libro"] .progress>div{border-radius:1px}
+[data-estilo="libro"] .meter>div{background:var(--amber)}
+
+/* formularios y botones */
+[data-estilo="libro"] input,[data-estilo="libro"] select,[data-estilo="libro"] textarea{border-radius:4px}
+[data-estilo="libro"] input:focus,[data-estilo="libro"] select:focus,[data-estilo="libro"] textarea:focus{box-shadow:0 0 0 3px var(--accent-soft)}
+[data-estilo="libro"] button.btn{border-radius:4px;color:var(--ink);font-weight:600}
+[data-estilo="libro"] button.btn:hover{filter:brightness(1.08)}
+[data-estilo="libro"] button.btn.ghost{background:transparent;color:var(--text)}
+[data-estilo="libro"] button.btn.ghost:hover{background:var(--panel2)}
+[data-estilo="libro"] button.btn.danger{background:transparent}
+[data-estilo="libro"] .top-actions .btn.ghost{border-radius:4px!important}
+[data-estilo="libro"] .pill{border-radius:3px;background:var(--accent-soft);color:var(--accent)}
+
+/* tablas: como un libro contable */
+[data-estilo="libro"] th{font-family:var(--num);font-weight:500;font-size:11px;letter-spacing:.08em;
+  color:var(--muted);border-bottom:1.5px solid var(--text)}
+[data-estilo="libro"] tbody tr:hover{background:var(--panel2)}
+
+/* colores fijos que vienen escritos dentro del HTML que arma el JavaScript */
+[data-estilo="libro"] [style*="#d8d2ec"]{color:var(--text)!important}
+[data-estilo="libro"] [style*="color:#0e0b1a"]{color:var(--ink)!important}
+[data-estilo="libro"] [style*="rgba(167,139,250"]{background:var(--panel3)!important}
+[data-estilo="libro"] [fill="#736b91"]{fill:var(--muted)}
+[data-estilo="libro"] [style*="#736b91"]{color:var(--muted)!important}
+[data-estilo="libro"] svg text[font-family="Sora"]{font-family:var(--num)}
+
+@media (max-width:640px){
+  [data-estilo="libro"] .hero-card,[data-estilo="libro"] .panel,[data-estilo="libro"] .card{border-radius:6px}
+  [data-estilo="libro"] .hero-value{font-size:34px}
+  [data-estilo="libro"] header h1{font-size:19px}
+}
+</style>
+<script>
+  // Estilo antes de pintar (evita ver un instante el otro estilo al abrir).
+  try{ document.documentElement.setAttribute("data-estilo", localStorage.getItem("finanzas_estilo") || "neon"); }catch(e){}
+</script>
+
 <style id="app-branding">
 .app-brand-image{width:48px;height:48px;object-fit:contain;display:block;flex-shrink:0}
 .logo:has(.app-brand-image){width:48px;height:48px;background:none;border-radius:0;box-shadow:none;padding:0}
@@ -113,6 +213,7 @@
   <div class="top-actions">
     <button class="btn ghost" id="inv-link" onclick="irAInversiones(this)" title="Ir a Mis Inversiones (sin volver a iniciar sesión)" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap">📈 Inversiones</button>
     <span id="sync-status" class="small muted"></span>
+    <button id="estilo-toggle" class="btn ghost" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap" onclick="toggleEstilo()" title="Cambiar estilo de la app">Aa</button>
     <button id="theme-toggle" class="btn ghost" style="width:36px;height:36px;border-radius:11px;padding:0" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
     <button class="btn ghost" style="width:36px;height:36px;border-radius:50%;padding:0" onclick="logout()" title="Cerrar sesión">⎋</button>
   </div>
@@ -617,6 +718,7 @@ async function enterApp(){
 }
 async function boot(){
   applyTheme(localStorage.getItem("finanzas_theme")||"dark");
+  try{ applyEstilo(localStorage.getItem("finanzas_estilo")||"neon"); }catch(e){ applyEstilo("neon"); }
   if(!(window.supabase&&window.FIN_CONFIG&&window.FIN_CONFIG.SUPABASE_URL)){ alert("No se pudo cargar Supabase."); return; }
   SB=window.supabase.createClient(window.FIN_CONFIG.SUPABASE_URL, window.FIN_CONFIG.SUPABASE_ANON_KEY);
   // Llegada desde «Mis Inversiones» con #sso=<código>: se canjea por una sesión
@@ -855,6 +957,23 @@ function renderAll(){
 function applyTheme(t){
   document.documentElement.setAttribute("data-theme", t);
   const b=document.getElementById("theme-toggle"); if(b) b.textContent = t==="dark"?"☀️":"🌙";
+}
+/* ============ Estilo visual: «Neón» (original) / «Libro» ============
+   Independiente del modo claro/oscuro: cada estilo tiene sus dos modos. */
+const ESTILOS = {neon: "Neón", libro: "Libro"};
+function applyEstilo(e){
+  if(!ESTILOS[e]) e = "neon";
+  document.documentElement.setAttribute("data-estilo", e);
+  const otro = e === "neon" ? "libro" : "neon";
+  const b = document.getElementById("estilo-toggle");
+  if(b){ b.textContent = "Aa · " + ESTILOS[otro]; b.title = "Estilo actual: " + ESTILOS[e] + ". Cambiar a " + ESTILOS[otro]; }
+}
+function toggleEstilo(){
+  let cur = "neon";
+  try{ cur = localStorage.getItem("finanzas_estilo") || "neon"; }catch(e){}
+  const nuevo = cur === "libro" ? "neon" : "libro";
+  try{ localStorage.setItem("finanzas_estilo", nuevo); }catch(e){}
+  applyEstilo(nuevo);
 }
 function toggleTheme(){
   const cur=localStorage.getItem("finanzas_theme")==="dark"?"light":"dark";
