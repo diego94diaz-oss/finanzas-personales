@@ -495,9 +495,13 @@ function rpgCelebrar(st){
     rpgToast(`⚔️ <b>Tu aventura comienza</b><br>Nivel ${st.nivel} · ${escHtml(st.rango[2])}`);
     return;
   }
-  if(ahora.nivel > previo.nivel) rpgToast(`⬆️ <b>¡Subiste a nivel ${ahora.nivel}!</b><br>${escHtml(st.rango[2])}`);
+  const avisos = [];
+  if(ahora.nivel > previo.nivel) avisos.push(`⬆️ <b>¡Subiste a nivel ${ahora.nivel}!</b><br>${escHtml(st.rango[2])}`);
   st.jefes.filter(j => !j.vivo && !(previo.jefes||[]).includes(j.d.id)).forEach(j =>
-    rpgToast(`💀 <b>¡Derrotaste al ${j.m.n} «${escHtml(j.d.name)}»!</b><br>+${RPG.XP_JEFE} XP`));
-  st.logros.filter(l => l.ok && !(previo.logros||[]).includes(l.id)).forEach(l =>
-    rpgToast(`🏆 <b>Logro: ${escHtml(l.nombre)}</b><br>+${RPG.XP_RAREZA[l.rareza]} XP`));
+    avisos.push(`💀 <b>¡Derrotaste al ${j.m.n} «${escHtml(j.d.name)}»!</b><br>+${RPG.XP_JEFE} XP`));
+  const nuevos = st.logros.filter(l => l.ok && !(previo.logros||[]).includes(l.id));
+  // varios logros a la vez (p. ej. tras cargar meses de cartolas) van en un solo aviso
+  if(nuevos.length > 2) avisos.push(`🏆 <b>${nuevos.length} logros nuevos</b><br>${nuevos.map(l => escHtml(l.nombre)).join(" · ")}`);
+  else nuevos.forEach(l => avisos.push(`🏆 <b>Logro: ${escHtml(l.nombre)}</b><br>+${RPG.XP_RAREZA[l.rareza]} XP`));
+  avisos.slice(0, 3).forEach(rpgToast);
 }

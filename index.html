@@ -69,7 +69,7 @@
   button.btn{background:var(--grad);color:#0e0b1a;border:none;padding:12px 20px;border-radius:999px;font-weight:700;cursor:pointer;font-size:14px;box-shadow:none;font-family:inherit}button.btn:hover{filter:brightness(1.06)}button.btn.ghost{background:var(--panel);color:var(--text);border:1px solid var(--line);box-shadow:none}button.btn.ghost:hover{background:var(--panel2)}button.btn.danger{background:var(--panel);color:var(--red);border:1px solid var(--line);box-shadow:none}
   table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.4px}tbody tr:hover{background:rgba(255,255,255,.04)}.pos{color:var(--green)}.neg{color:var(--red)}.pill{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;background:rgba(167,139,250,.16);color:var(--accent);border:none;font-weight:700}.muted{color:var(--muted)}.small{font-size:13px}.flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.empty{color:var(--muted);text-align:center;padding:26px;font-size:14px}.tip{background:rgba(167,139,250,.10);border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-top:10px;font-size:13px;color:var(--text)}.bar-row{display:flex;align-items:center;gap:10px;margin:7px 0}.bar-label{width:130px;font-size:13px;flex-shrink:0}.bar-track{flex:1;background:rgba(255,255,255,.07);border-radius:99px;height:8px;overflow:hidden}.bar-fill{height:100%;border-radius:99px;background:var(--grad)}.bar-val{width:110px;text-align:right;font-size:13px;flex-shrink:0}.progress{background:rgba(255,255,255,.07);border-radius:99px;height:10px;overflow:hidden;margin-top:6px}.progress>div{height:100%;background:var(--grad);border-radius:99px}.icon-del{background:none;border:none;color:#c7c3c0;cursor:pointer;font-size:15px}.icon-del:hover{color:var(--red)}hr{border:none;border-top:1px solid var(--line);margin:18px 0}div:has(> table){overflow-x:auto;-webkit-overflow-scrolling:touch}
   @media (max-width:900px){main{padding:18px 16px}.hero-row,.mid-row,.bottom-row,.health-grid{grid-template-columns:1fr}.hero-value{font-size:38px}nav{top:67px;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}nav::-webkit-scrollbar{display:none}}
-  @media (max-width:640px){body{font-size:14px}header{padding:16px 18px 10px}.logo{width:26px;height:26px;border-radius:9px;font-size:13px}header h1{font-size:14px}nav{padding:10px 16px;gap:5px}.hero-card,.panel,.card{border-radius:18px;padding:18px}.metric-card{min-height:120px}.hero-value{font-size:38px}.cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.row{grid-template-columns:1fr 1fr}.row>div:has(button){grid-column:1/-1}table{font-size:13px}th,td{padding:8px 6px;white-space:nowrap}.bar-label{width:92px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar-val{width:88px;font-size:12px}.cat-layout{flex-direction:column;align-items:stretch}.cat-layout svg{align-self:center}}
+  @media (max-width:640px){body{font-size:14px}header{padding:16px 18px 10px}.logo{width:26px;height:26px;border-radius:9px;font-size:13px}header h1{font-size:14px}nav{padding:10px 16px;gap:5px}.hero-card,.panel,.card{border-radius:18px;padding:18px}.metric-card{min-height:120px}.hero-value{font-size:38px}.cards{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.row{grid-template-columns:1fr 1fr}.row>div:has(button){grid-column:1/-1}table{font-size:13px}th,td{padding:8px 6px}th,td[style*="text-align:right"],td.num{white-space:nowrap}.bar-label{width:92px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar-val{width:88px;font-size:12px}.cat-layout{flex-direction:column;align-items:stretch}.cat-layout svg{align-self:center}}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9998;padding:18px;backdrop-filter:blur(4px)}
   .modal-card{background:var(--panel);border:1px solid var(--border);border-radius:24px;padding:26px;width:480px;max-width:100%;max-height:90vh;overflow:auto;box-shadow:var(--shadow)}
   .modal-card h2{margin:0 0 16px;font-size:20px;font-weight:700}
@@ -268,7 +268,85 @@
 @keyframes rpgIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
 @media (max-width:900px){.rpg-cols{grid-template-columns:1fr}}
 @media (max-width:640px){.rpg-hud{gap:10px}.rpg-hud .rpg-chip{font-size:11px}.rpg-hero-lv{font-size:28px}
+  .rpg-stats{grid-template-columns:1fr 1fr;gap:8px}.rpg-stat{padding:8px 10px}.rpg-stat .tiny-note{font-size:11px}
   .rpg-avatar.big{width:64px;height:64px;font-size:34px}#rpg-toasts{left:16px;right:16px;max-width:none}}
+</style>
+<style id="estilo-movil">
+/* ===== Celular (2026-10-24) =====
+   Tablas largas -> tarjetas; encabezado de íconos; botones de al menos 36px para el dedo. */
+@media (max-width:900px){ body{overflow-x:clip} }
+@media (max-width:640px){
+  .solo-pc{display:none}
+  header{padding:10px 14px;gap:8px}
+  .top-actions{gap:6px}
+  .top-actions .btn.ghost{height:36px;min-width:36px;padding:0 10px!important}
+  #sync-status{display:none}
+  #sync-status[data-s="guardando"],#sync-status[data-s="error"]{display:inline;font-size:11px}
+  nav{top:61px}                                   /* = alto del encabezado compacto */
+  /* montos grandes: que quepan en tarjetas de dos columnas */
+  .card .big{font-size:22px}
+  .card h3{font-size:11.5px}
+  .cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .stack-value,.stat-box b{overflow-wrap:anywhere}
+  table{font-size:12.5px}th,td{padding:7px 5px}
+  /* Movimientos: el historial va justo después de registrar; la configuración, al final */
+  #movimientos.active{display:flex;flex-direction:column}
+  #movimientos > .panel{order:2}
+  #movimientos > .panel:first-child{order:0}
+  #movimientos > .panel:last-child{order:1}
+  nav{padding:8px 12px;scroll-padding:0 40px;
+      -webkit-mask-image:linear-gradient(90deg,#000 90%,transparent);mask-image:linear-gradient(90deg,#000 90%,transparent)}
+  nav button{padding:8px 12px}
+  main{padding:14px 12px 40px}
+  .panel,.card,.hero-card{padding:16px}
+  .panel h2{font-size:12px}
+  .hero-value{font-size:34px}
+  .metric-value{font-size:28px}
+  /* 16px evita que el teléfono haga zoom al escribir en un campo */
+  input,select,textarea{font-size:16px}
+  .icon-del{min-width:36px;min-height:36px;font-size:17px}
+  button.btn{padding:11px 16px}
+  .modal-card{padding:20px;border-radius:18px}
+  .modal-bg{align-items:flex-end;padding:0}
+  .modal-card{width:100%;max-height:88vh;border-bottom-left-radius:0;border-bottom-right-radius:0}
+
+  /* --- tablas convertidas en tarjetas --- */
+  table.tbl-mov thead,table.tbl-fijos thead,table.tbl-cart thead{display:none}
+  table.tbl-mov,table.tbl-fijos,table.tbl-cart,
+  .tbl-mov tbody,.tbl-fijos tbody,.tbl-cart tbody{display:block}
+  .tbl-mov tr,.tbl-fijos tr,.tbl-cart tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;
+    padding:11px 2px;border-bottom:1px solid var(--line)}
+  .tbl-mov td,.tbl-fijos td,.tbl-cart td{display:block;border:0;padding:0;white-space:normal!important;text-align:left!important}
+  .tbl-mov tbody tr:hover,.tbl-fijos tbody tr:hover,.tbl-cart tbody tr:hover{background:none}
+
+  /* Movimientos: 1ª línea descripción + monto; 2ª fecha, categoría, cuenta y acciones */
+  .tbl-mov td:nth-child(5){order:1;flex:1 1 60%;min-width:0;font-weight:600;font-size:14px;overflow-wrap:anywhere}
+  .tbl-mov td:nth-child(6){order:2;margin-left:auto;font-size:15px;white-space:nowrap!important;text-align:right!important}
+  .tbl-mov tr::before{content:"";order:3;flex-basis:100%;height:0}     /* salto de línea */
+  .tbl-mov td:nth-child(1){order:4;font-size:12px;color:var(--muted);font-family:var(--num)}
+  .tbl-mov td:nth-child(3){order:5}
+  .tbl-mov td:nth-child(4){order:6;font-size:12px;color:var(--muted);flex:1 1 0;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap!important}
+  .tbl-mov td:nth-child(2){display:none}                               /* el signo y el color ya dicen el tipo */
+  .tbl-mov td:nth-child(7){order:7;margin-left:auto;display:flex;gap:2px}
+
+  /* Gastos fijos: nombre + monto; luego categoría y meses; botones de clasificación a lo ancho */
+  .tbl-fijos td:nth-child(1){order:1;flex:1 1 60%;min-width:0;font-weight:600}
+  .tbl-fijos td:nth-child(3){order:2;margin-left:auto;white-space:nowrap!important}
+  .tbl-fijos td:nth-child(2){order:3}
+  .tbl-fijos td:nth-child(4){order:4;font-size:12px}
+  .tbl-fijos td:nth-child(4)::after{content:" meses"}
+  .tbl-fijos td:nth-child(5){order:5;flex-basis:100%}
+  .tbl-fijos td:nth-child(5) .flex{flex-wrap:wrap!important}
+  .tbl-fijos td:nth-child(5) button{flex:1;min-height:36px}
+
+  /* Vista previa de cartolas: descripción + monto; fecha y cuenta; selector de categoría a lo ancho */
+  .tbl-cart td:nth-child(2){order:1;flex:1 1 60%;min-width:0;font-weight:600;overflow-wrap:anywhere}
+  .tbl-cart td:nth-child(5){order:2;margin-left:auto;white-space:nowrap!important}
+  .tbl-cart td:nth-child(1){order:3;font-size:12px;color:var(--muted);font-family:var(--num)}
+  .tbl-cart td:nth-child(3){order:4;font-size:12px;color:var(--muted)}
+  .tbl-cart td:nth-child(4){order:5;flex-basis:100%}
+}
 </style>
 <style id="app-branding">
 .app-brand-image{width:48px;height:48px;object-fit:contain;display:block;flex-shrink:0}
@@ -303,7 +381,7 @@
   </div>
   <div class="spacer"></div>
   <div class="top-actions">
-    <button class="btn ghost" id="inv-link" onclick="irAInversiones(this)" title="Ir a Mis Inversiones (sin volver a iniciar sesión)" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap">📈 Inversiones</button>
+    <button class="btn ghost" id="inv-link" onclick="irAInversiones(this)" title="Ir a Mis Inversiones (sin volver a iniciar sesión)" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap">📈<span class="solo-pc"> Inversiones</span></button>
     <span id="sync-status" class="small muted"></span>
     <button id="estilo-toggle" class="btn ghost" style="height:36px;border-radius:11px;padding:0 12px;white-space:nowrap" onclick="toggleEstilo()" title="Cambiar estilo de la app">Aa</button>
     <button id="theme-toggle" class="btn ghost" style="width:36px;height:36px;border-radius:11px;padding:0" onclick="toggleTheme()" title="Cambiar tema">🌙</button>
@@ -721,6 +799,7 @@ function setSyncStatus(s){
   const el=document.getElementById("sync-status"); if(!el) return;
   const map={ ok:"✓ Guardado", guardando:"⏳ Guardando…", pendiente:"…", error:"⚠️ Error" };
   el.textContent=map[s]||"";
+  el.dataset.s=s||"";
 }
 
 /* save(): cachea local + agenda sync a la nube (debounce) */
@@ -1040,6 +1119,8 @@ document.getElementById("nav").addEventListener("click",e=>{
   const tab=e.target.dataset.tab;
   document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b===e.target));
   document.querySelectorAll(".section").forEach(s=>s.classList.toggle("active",s.id===tab));
+  try{ e.target.scrollIntoView({inline:"center",block:"nearest",behavior:"smooth"}); }catch(_){}
+  window.scrollTo(0,0);
   renderAll();
 });
 
@@ -1066,7 +1147,7 @@ function applyEstilo(e){
   document.documentElement.setAttribute("data-estilo", e);
   const otro = e === "neon" ? "libro" : "neon";
   const b = document.getElementById("estilo-toggle");
-  if(b){ b.textContent = "Aa · " + ESTILOS[otro]; b.title = "Estilo actual: " + ESTILOS[e] + ". Cambiar a " + ESTILOS[otro]; }
+  if(b){ b.innerHTML = 'Aa<span class="solo-pc"> · ' + ESTILOS[otro] + '</span>'; b.title = "Estilo actual: " + ESTILOS[e] + ". Cambiar a " + ESTILOS[otro]; }
 }
 function toggleEstilo(){
   let cur = "neon";
@@ -1833,7 +1914,7 @@ function renderFijos(){
         style="border:1px solid ${on?color:"var(--border)"};background:${on?color+"26":"transparent"};color:${on?color:"var(--muted)"};
         border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">${label}</button>`;
     };
-    lista.innerHTML=`<table><thead><tr><th>Gasto</th><th>Categoría</th><th style="text-align:right">$/mes (mediana)</th><th style="text-align:right">Meses</th><th>Clasificación</th></tr></thead><tbody>`+
+    lista.innerHTML=`<table class="tbl-fijos"><thead><tr><th>Gasto</th><th>Categoría</th><th style="text-align:right">$/mes (mediana)</th><th style="text-align:right">Meses</th><th>Clasificación</th></tr></thead><tbody>`+
       visibles.map(g=>`<tr style="${g.clasif==="variable"?"opacity:.45":""}">
         <td>${g.nombre.slice(0,38)}<div class="small muted">último: ${g.last}</div></td>
         <td>${catChip(g.cat)}</td>
@@ -2455,7 +2536,7 @@ function renderTransactions(){
     </tr>`;
   }).join("");
   document.getElementById("mv-list").innerHTML=
-    `<table><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Descripción</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+    `<table class="tbl-mov"><thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Cuenta</th><th>Descripción</th><th style="text-align:right">Monto</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
     +mvPie(list.length,totalSinMes.length,fm);
 }
 

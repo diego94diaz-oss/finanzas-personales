@@ -165,7 +165,7 @@ function cartolasRenderPreview(r){
   if(nuevos.length){
     html += '<div class="panel"><h2>Se agregarán estos ' + nuevos.length + ' movimientos</h2>' +
       '<p class="small muted">Puedes corregir la categoría antes de guardar.</p>' +
-      '<table><thead><tr><th>Fecha</th><th>Descripción</th><th>Cuenta</th><th>Categoría</th>' +
+      '<table class="tbl-cart"><thead><tr><th>Fecha</th><th>Descripción</th><th>Cuenta</th><th>Categoría</th>' +
       '<th style="text-align:right">Monto</th></tr></thead><tbody>' + filas + '</tbody></table>' +
       '<div class="flex" style="margin-top:14px">' +
       '<button class="btn" onclick="cartolasAplicar()">✓ Agregar ' + nuevos.length + ' movimientos</button>' +
