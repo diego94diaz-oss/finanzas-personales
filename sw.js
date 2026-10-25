@@ -3,9 +3,9 @@
    Las llamadas a Supabase y a las fuentes (cross-origin) pasan directo a la red,
    salvo el lector de Excel, que se cachea aparte para poder cargar cartolas sin
    conexión. */
-const CACHE = "finanzas-sb-brand-20261024a";   // v26: segundo estilo visual «Libro» (botón Aa), el «Neón» queda igual
+const CACHE = "finanzas-sb-brand-20261024b";   // v27: pestaña Aventura (RPG: misiones, jefes, logros)
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg", "./icon-192.png", "./icon-512.png", "./datos_cifrados.js",
-  "./cartolas.js", "./cartolas_ui.js"];
+  "./cartolas.js", "./cartolas_ui.js", "./aventura.js"];
 
 // Librería externa (lee .xlsx y el .xls binario de Falabella). Se cachea "best
 // effort" y FUERA de addAll: si el CDN falla, la instalación del SW no debe

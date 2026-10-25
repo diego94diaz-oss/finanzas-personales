@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="./cartolas.js"></script>
 <script src="./cartolas_ui.js"></script>
+<script src="./aventura.js"></script>
 <script>
   // Credenciales Supabase (anon/publishable key: pública por diseño; los datos
   // están protegidos por Row Level Security + login, ver schema.sql).
@@ -23,7 +24,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20261001">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Pixelify+Sans:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#0e0b1a; --panel:#18142b; --panel2:#211a36; --panel3:#120f22;
@@ -178,6 +179,97 @@
   try{ document.documentElement.setAttribute("data-estilo", localStorage.getItem("finanzas_estilo") || "neon"); }catch(e){}
 </script>
 
+<style id="estilo-aventura">
+/* ===== Aventura (RPG) — 2026-10-24. Solo variables: funciona en Neón y en Libro. ===== */
+.rpg-px{font-family:"Pixelify Sans",var(--num);letter-spacing:.02em}
+[data-estilo="libro"] .rpg-px{font-family:var(--serif)}
+.rpg-shell{display:flex;flex-direction:column;gap:0}
+.rpg-bar{height:10px;border-radius:3px;background:var(--line);overflow:hidden;margin:8px 0 6px;
+  background-image:repeating-linear-gradient(90deg,transparent 0 9px,var(--bg) 9px 10px)}
+.rpg-bar>div{height:100%;background:var(--accent);border-radius:3px;transition:width .6s ease;
+  background-image:repeating-linear-gradient(90deg,transparent 0 9px,rgba(0,0,0,.25) 9px 10px)}
+.rpg-bar.xp>div{background-color:var(--amber)}
+.rpg-bar.big{height:16px}
+.rpg-bar.ok>div{background-color:var(--green-strong)}
+.rpg-bar.alerta>div{background-color:var(--amber)}
+.rpg-bar.mal>div{background-color:var(--red)}
+.rpg-bar.hp>div{background-color:var(--red)}
+.rpg-avatar{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-size:22px;background:var(--accent-soft);border:1px solid var(--line);flex:none}
+.rpg-avatar.big{width:84px;height:84px;font-size:44px;border-radius:16px;border:2px solid var(--amber)}
+/* indicador en Resumen */
+.rpg-hud{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:14px;flex-wrap:wrap;width:100%;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 16px;color:var(--text);font-family:var(--font)}
+.rpg-hud:hover{border-color:var(--accent)}
+.rpg-hud-lv{display:flex;flex-direction:column;line-height:1.25}
+.rpg-hud-lv .rpg-px{font-size:18px;font-weight:700;color:var(--amber)}
+.rpg-hud-xp{flex:1;min-width:160px;display:flex;flex-direction:column}
+.rpg-hud-xp .rpg-bar{margin:2px 0 3px}
+.rpg-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.rpg-hud .rpg-chips{margin:0}
+.rpg-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:12px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--soft);white-space:nowrap}
+.rpg-chip.trofeo{opacity:.75}
+[data-estilo="libro"] .rpg-chip,[data-estilo="libro"] .rpg-hud{border-radius:4px}
+/* héroe */
+.rpg-hero{border-top:3px solid var(--amber)}
+.rpg-hero-main{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.rpg-hero-lv{font-size:34px;font-weight:700;color:var(--amber);line-height:1.1;margin-top:4px}
+.rpg-hero-title{font-size:16px;font-weight:600;margin-bottom:4px}
+.rpg-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:18px}
+.rpg-stat{padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);cursor:help}
+.rpg-stat-head{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+.rpg-stat-head b{color:var(--amber);font-size:15px}
+.rpg-stat .rpg-bar{height:7px;margin:6px 0 4px}
+.rpg-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.rpg-cols{display:grid;grid-template-columns:1.3fr 1fr;gap:16px}
+/* misiones */
+.rpg-quests{display:flex;flex-direction:column;gap:10px}
+.rpg-quest{display:flex;gap:12px;padding:12px 14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
+.rpg-quest.ok{border-color:var(--green-strong)}
+.rpg-quest.mal{opacity:.72}
+.rpg-quest.na{opacity:.55}
+.rpg-quest-ico{font-size:24px;line-height:1;flex:none;width:30px;text-align:center}
+.rpg-quest-body{flex:1;min-width:0}
+.rpg-quest-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.rpg-xp{font-family:var(--num);font-size:12px;font-weight:700;color:var(--amber);white-space:nowrap}
+.rpg-quest-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.rpg-tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--panel3);color:var(--muted)}
+.rpg-tag.ok{background:var(--green-strong);color:var(--ink)}
+.rpg-tag.mal{color:var(--red)}
+.rpg-tag.curso{color:var(--cyan)}
+.rpg-accion{margin-top:8px;padding:5px 12px!important;font-size:12px!important}
+/* jefes */
+.rpg-bosses{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.rpg-boss{padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
+.rpg-boss-head{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+.rpg-boss-ico{font-size:34px;line-height:1}
+.rpg-hp-label{display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:var(--red)}
+.rpg-hp-label + .rpg-bar{margin-top:4px}
+/* logros */
+.rpg-logros{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.rpg-logro{display:flex;gap:12px;padding:12px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--muted)}
+.rpg-logro-ico{font-size:26px;line-height:1;flex:none}
+.rpg-logro.lock{opacity:.5}.rpg-logro.lock .rpg-logro-ico{filter:grayscale(1)}
+.rpg-logro.raro{border-left-color:var(--cyan)}.rpg-logro.epico{border-left-color:var(--accent)}
+.rpg-logro.legendario{border-left-color:var(--amber)}
+.rpg-rareza{font-size:11px;font-weight:700;margin-top:4px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.rpg-logro.ok.raro .rpg-rareza{color:var(--cyan)}.rpg-logro.ok.epico .rpg-rareza{color:var(--accent)}
+.rpg-logro.ok.legendario .rpg-rareza{color:var(--amber)}
+/* diario */
+.rpg-log{display:flex;flex-direction:column;gap:7px;font-size:13px}
+.rpg-log-f{font-family:var(--num);font-size:11.5px;color:var(--muted);display:inline-block;min-width:42px}
+.rpg-help summary{cursor:pointer}
+/* avisos */
+#rpg-toasts{position:fixed;right:18px;bottom:18px;z-index:9997;display:flex;flex-direction:column;gap:10px;max-width:320px}
+.rpg-toast{background:var(--panel);border:2px solid var(--amber);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);
+  font-size:13.5px;line-height:1.4;cursor:pointer;animation:rpgIn .35s ease;transition:opacity .5s,transform .5s}
+.rpg-toast.fuera{opacity:0;transform:translateY(10px)}
+@keyframes rpgIn{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
+@media (max-width:900px){.rpg-cols{grid-template-columns:1fr}}
+@media (max-width:640px){.rpg-hud{gap:10px}.rpg-hud .rpg-chip{font-size:11px}.rpg-hero-lv{font-size:28px}
+  .rpg-avatar.big{width:64px;height:64px;font-size:34px}#rpg-toasts{left:16px;right:16px;max-width:none}}
+</style>
 <style id="app-branding">
 .app-brand-image{width:48px;height:48px;object-fit:contain;display:block;flex-shrink:0}
 .logo:has(.app-brand-image){width:48px;height:48px;background:none;border-radius:0;box-shadow:none;padding:0}
@@ -221,6 +313,7 @@
 
 <nav id="nav">
   <button data-tab="dashboard" class="active">Resumen</button>
+  <button data-tab="aventura">⚔️ Aventura</button>
   <button data-tab="salud">Salud financiera</button>
   <button data-tab="inversiones">Inversiones</button>
   <button data-tab="cuentas">Cuentas</button>
@@ -236,6 +329,7 @@
   <!-- DASHBOARD -->
   <section id="dashboard" class="section active">
     <div class="dashboard-shell">
+      <div id="dash-rpg"></div>
       <div id="dash-frescura"></div>
       <div id="dash-saldo25"></div>
       <div class="panel" id="dash-budget-panel" style="display:none">
@@ -294,6 +388,11 @@
   </section>
 
   <!-- SALUD FINANCIERA -->
+  <!-- AVENTURA (RPG): todo lo arma aventura.js a partir de los datos -->
+  <section id="aventura" class="section">
+    <div id="aventura-body"></div>
+  </section>
+
   <section id="salud" class="section">
     <div class="health-shell">
       <div class="hero-row">
@@ -951,6 +1050,7 @@ function renderAll(){
   renderBudget(); renderPie(); renderComparador(); renderSubs(); renderHormiga();
   renderRecurring(); renderCatRules(); renderAnalisis(); renderFijos(); renderStorageInfo();
   renderInversiones(); publicarResumen();
+  if(typeof renderAventura==='function') renderAventura();
 }
 
 /* ============ Tema claro/oscuro ============ */
